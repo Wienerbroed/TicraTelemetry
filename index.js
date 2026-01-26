@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { connectDB, getFiveLatest } from './database/db.js';
+import { connectDB, getFiveLatest, getEventType } from './database/db.js';
 
 // Setup express
 const app = express();
@@ -30,6 +30,19 @@ app.get('/latest', async (req, res) => {
   try {
     // Calls get 5 latest and return in json format on page
     const data = await getFiveLatest();
+    res.json(data);
+
+    // Catch error
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+// event type page
+app.get('/event', async (req, res) => {
+  try {
+    // Calls get event type function
+    const data = await getEventType();
     res.json(data);
 
     // Catch error

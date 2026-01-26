@@ -61,6 +61,25 @@ const getFiveLatest = async () => {
   }
 };
 
+// Fetch event types
+const getEventType = async () => {
+  try {
+    // Connects database
+    const database = await connectDB();
+
+    // Sets collection from database
+    const collection = database.collection('gui_event');
+
+    // Calls alle event types but only saves unique event types
+    return await collection.distinct('event_type');
+
+    // Error catch
+  } catch (err) {
+    console.error('No event-type found');
+    throw err;
+  }
+}
+
 
 // Exported functions for use in other files
-export { connectDB, getFiveLatest };
+export { connectDB, getFiveLatest, getEventType };
