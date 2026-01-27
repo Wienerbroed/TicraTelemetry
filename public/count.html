@@ -7,23 +7,65 @@
 
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Make chart half the size */
+        #chartContainer {
+            width: 50%;
+            margin: auto;
+        }
+    </style>
 </head>
 <body>
 
     <h2>Event Types Count</h2>
-    <canvas id="eventChart" width="100" height="50"></canvas>
+
+    <!-- Dropdown to select individual event -->
+    <label for="eventSelect">Select Event:</label>
+    <select id="eventSelect">
+        <option value="all">All Events</option>
+    </select>
+
+    <div id="chartContainer">
+        <canvas id="eventChart"></canvas>
+    </div>
 
     <script>
-        async function loadChart() {
+        let chartInstance;
+
+        async function loadChart(selectedEvent = 'all') {
             const response = await fetch('/count');
             const data = await response.json();
 
-            const labels = Object.keys(data);
-            const values = Object.values(data);
+            // Populate dropdown if not already
+            const select = document.getElementById('eventSelect');
+            if (select.options.length === 1) { // first load
+                Object.keys(data).forEach(key => {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = key;
+                    select.appendChild(option);
+                });
+            }
+
+            let labels, values;
+
+            if (selectedEvent === 'all') {
+                labels = Object.keys(data);
+                values = Object.values(data);
+            } else {
+                labels = [selectedEvent];
+                values = [data[selectedEvent]];
+            }
 
             const ctx = document.getElementById('eventChart').getContext('2d');
 
-            new Chart(ctx, {
+            // Destroy previous chart if exists
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -50,6 +92,12 @@
             });
         }
 
+        // Event listener for dropdown
+        document.getElementById('eventSelect').addEventListener('change', (e) => {
+            loadChart(e.target.value);
+        });
+
+        // Initial chart load
         loadChart();
     </script>
 

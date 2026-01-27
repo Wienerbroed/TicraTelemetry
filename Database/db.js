@@ -1,3 +1,4 @@
+import e from 'express';
 import { MongoClient } from 'mongodb';
 
 // Enviromental variables
@@ -10,10 +11,6 @@ const uri = `mongodb+srv://${username}:${password}@telemetry.tgndpzv.mongodb.net
 // Attributes
 let client;
 let db;
-
-
-// Array for storing event types
-const eventTypes = [];
 
 // Connect to Mongodb
 const connectDB = async () => {
@@ -41,6 +38,11 @@ const connectDB = async () => {
     process.exit(1);
   }
 };
+
+//////////////////////////////////////////// Event types ////////////////////////////////////////////
+
+// Array for storing event types
+const eventTypes = [];
 
 // Set attribute for connected database
 const database = await connectDB();
@@ -116,6 +118,69 @@ const countEventTypes = async () => {
   }
 };
 
+// Array for storing unique payload numbers 
+const payloadNumbers = [];
+
+// Get unique payload numbers
+const getPayload = async () => {
+  try {
+    // Fetch unique payload numbers
+    const distinctPayload = await eventTypeCollection.distinct('payload.objectsExplorerSelection');
+
+    // Push numbers to payloadNumbers
+    payloadNumbers.push(...distinctPayload);
+
+    return payloadNumbers;
+
+    // Error catch
+  } catch (err) {
+    console.error('Cannot find payload numbers')
+  }
+}
+
+const payloadByEventType = async () => {
+  try {
+    // Aggregation pipeline
+    const result = await eventTypeCollection.aggregate([
+      {
+        // Group by event_type and payload
+        $group: {
+          _id: { event_type: "$event_type", payload: "$payload.objectsExplorerSelection" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        // Group again by event_type to collect all payloads
+        $group: {
+          _id: "$_id.event_type",
+          payloads: {
+            $push: {
+              payload: "$_id.payload",
+              count: "$count"
+            }
+          }
+        }
+      },
+      {
+        // Optional: rename _id to event_type
+        $project: {
+          _id: 0,
+          event_type: "$_id",
+          payloads: 1
+        }
+      }
+    ]).toArray();
+
+    return result;
+
+  } catch (err) {
+    console.error("Failed to fetch payloads by event type:", err.message);
+    throw err;
+  }
+};
+
+
+
 
 
 
@@ -123,4 +188,4 @@ const countEventTypes = async () => {
 
 
 // Exported functions for use in other files
-export { connectDB, getFiveLatest, getEventType, countEventTypes };
+export { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType };
