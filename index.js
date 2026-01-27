@@ -1,7 +1,7 @@
 //////////////////////////////////////////////// Imports ////////////////////////////////////////////////
 import 'dotenv/config';
 import express from 'express';
-import { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType } from './database/db.js';
+import { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType, getUsers, userInteractionCount } from './database/db.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -86,6 +86,33 @@ app.get('/payloadevent', async (req, res) => {
   try {
     // Calls get event type function
     const data = await payloadByEventType();
+    res.json(data);
+
+    // Catch error
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+
+// users type page
+app.get('/users', async (req, res) => {
+  try {
+    // Calls get event type function
+    const data = await getUsers();
+    res.json(data);
+
+    // Catch error
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+// users type page
+app.get('/usercount', async (req, res) => {
+  try {
+    // Calls get event type function
+    const data = await userInteractionCount();
     res.json(data);
 
     // Catch error

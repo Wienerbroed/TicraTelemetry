@@ -118,6 +118,8 @@ const countEventTypes = async () => {
   }
 };
 
+//////////////////////////////////////////// Payload ////////////////////////////////////////////
+
 // Array for storing unique payload numbers 
 const payloadNumbers = [];
 
@@ -138,6 +140,7 @@ const getPayload = async () => {
   }
 }
 
+// Get payload by event type
 const payloadByEventType = async () => {
   try {
     // Aggregation pipeline
@@ -173,19 +176,63 @@ const payloadByEventType = async () => {
 
     return result;
 
+    // Catch error
   } catch (err) {
     console.error("Failed to fetch payloads by event type:", err.message);
     throw err;
   }
 };
 
+//////////////////////////////////////////// Users ////////////////////////////////////////////
 
+// Array to store uniqu users
+const userList = [];
 
+// Fetch users
+const getUsers = async () => {
+  try {
+    const distinctUsers = await eventTypeCollection.distinct('user_name');
 
+    userList.push(...distinctUsers);
 
+    return userList;
 
+  } catch (err) {
+    console.error('No users found', err.message);
+    throw err;
+  }
+}
 
+//count users
+const userInteractionCount = async () => {
+  try {
+    // Load users in db
+    const userage = await getUsers();
+
+    // Sets user attributes
+    const users = await eventTypeCollection
+      .find({}, {projection: {user_name: 1}})
+      .toArray();
+    
+      // Counter
+      const counts = {};
+
+      // stets user start count for users
+      userage.forEach(user=> counts[user] = 0);
+
+      // foreach to count users 
+      users.forEach(user => {
+        counts[user.user_name]++;
+      });
+
+      return counts;
+
+  } catch (err) {
+    console.error('No users found');
+    throw err;
+  }
+}
 
 
 // Exported functions for use in other files
-export { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType };
+export { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType, getUsers, userInteractionCount };
