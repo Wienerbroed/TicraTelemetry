@@ -37,55 +37,81 @@
 </head>
 <body>
   <h1>Payloads by Event Type</h1>
+
+    <label for="eventSelect"><strong>Select Event Type:</strong></label>
+    <select id="eventSelect">
+    <option value="">-- All Event Types --</option>
+    </select>
   <div id="content"></div>
 
-  <script>
-    async function loadPayloadData() {
-      try {
-        const response = await fetch('/payloadevent');
-        const data = await response.json();
+    <script>
+        let payloadData = [];
 
-        const container = document.getElementById('content');
+        function renderEvents(filterEventType = '') {
+            const container = document.getElementById('content');
+            container.innerHTML = '';
 
-        data.forEach(event => {
-          const eventTitle = document.createElement('div');
-          eventTitle.className = 'event-type';
-          eventTitle.textContent = `Event Type: ${event.event_type}`;
-          container.appendChild(eventTitle);
+            payloadData
+            .filter(event => !filterEventType || event.event_type === filterEventType)
+            .forEach(event => {
+                const eventTitle = document.createElement('div');
+                eventTitle.className = 'event-type';
+                eventTitle.textContent = `Event Type: ${event.event_type}`;
+                container.appendChild(eventTitle);
 
-          const table = document.createElement('table');
+                const table = document.createElement('table');
 
-          const header = table.insertRow();
-          header.insertCell().textContent = 'Payload';
-          header.insertCell().textContent = 'Count';
+                const header = table.insertRow();
+                header.insertCell().textContent = 'Payload';
+                header.insertCell().textContent = 'Count';
 
-          event.payloads.forEach(payloadObj => {
-            const row = table.insertRow();
+                event.payloads.forEach(payloadObj => {
+                const row = table.insertRow();
 
-            let payloadValue;
+                let payloadValue;
+                if (payloadObj.payload === null) {
+                    payloadValue = 'null';
+                } else if (typeof payloadObj.payload === 'string') {
+                    payloadValue = `"${payloadObj.payload}"`;
+                } else {
+                    payloadValue = payloadObj.payload;
+                }
 
-            if (payloadObj.payload === null) {
-              payloadValue = 'null';
-            } else if (typeof payloadObj.payload === 'string') {
-              payloadValue = `"${payloadObj.payload}"`; // wrap strings in quotes
-            } else {
-              payloadValue = payloadObj.payload; // numbers stay as-is
+                row.insertCell().textContent = payloadValue;
+                row.insertCell().textContent = payloadObj.count;
+                });
+
+                container.appendChild(table);
+            });
+        }
+
+        async function loadPayloadData() {
+            try {
+            const response = await fetch('/payloadevent');
+            payloadData = await response.json();
+
+            const select = document.getElementById('eventSelect');
+
+            payloadData.forEach(event => {
+                const option = document.createElement('option');
+                option.value = event.event_type;
+                option.textContent = event.event_type;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', e => {
+                renderEvents(e.target.value);
+            });
+
+            renderEvents(); // show all by default
+            } catch (err) {
+            console.error('Error fetching payload data:', err);
+            document.getElementById('content').textContent = 'Failed to load data.';
             }
+        }
 
-            row.insertCell().textContent = payloadValue;
-            row.insertCell().textContent = payloadObj.count;
-          });
+        loadPayloadData();
+    </script>
 
-          container.appendChild(table);
-        });
-
-      } catch (err) {
-        console.error('Error fetching payload data:', err);
-        document.getElementById('content').textContent = 'Failed to load data.';
-      }
-    }
-
-    loadPayloadData();
-  </script>
 </body>
 </html>

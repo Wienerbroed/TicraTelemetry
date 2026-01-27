@@ -233,6 +233,62 @@ const userInteractionCount = async () => {
   }
 }
 
+// get payload data by users
+const actionsByUsers = async () => {
+  try {
+    const result = await eventTypeCollection.aggregate([
+      {
+        // Step 1: Normalize payload
+        $addFields: {
+          normalizedPayload: {
+            $cond: [
+              { $ifNull: ["$payload.objectsExplorerSelection", false] },
+              "$payload.objectsExplorerSelection",
+              {
+                myfield: "$payload.myfield",
+                otherField: "$payload.otherField"
+              }
+            ]
+          }
+        }
+      },
+      {
+        // Step 2: Group by user and normalized payload
+        $group: {
+          _id: { user_name: "$user_name", payload: "$normalizedPayload" },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        // Step 3: Aggregate payloads per user
+        $group: {
+          _id: "$_id.user_name",
+          payloads: {
+            $push: {
+              payload: "$_id.payload",
+              count: "$count"
+            }
+          }
+        }
+      },
+      {
+        // Step 4: Clean output
+        $project: {
+          _id: 0,
+          event_type: "$_id",
+          payloads: 1
+        }
+      }
+    ]).toArray();
+
+    return result;
+  } catch (err) {
+    console.error("No payload found");
+    throw err;
+  }
+};
+
+
 
 // Exported functions for use in other files
-export { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType, getUsers, userInteractionCount };
+export { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType, getUsers, userInteractionCount, actionsByUsers };
