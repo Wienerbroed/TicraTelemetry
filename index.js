@@ -1,9 +1,14 @@
+//////////////////////////////////////////////// Imports ////////////////////////////////////////////////
 import 'dotenv/config';
 import express from 'express';
-import { connectDB, getFiveLatest, getEventType } from './database/db.js';
+import { connectDB, getFiveLatest, getEventType, countEventTypes } from './database/db.js';
+
+//////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
 // Setup express
 const app = express();
+
+app.use(express.static('public'));
 
 // Setup base elements for app
 (async () => {
@@ -18,7 +23,7 @@ const app = express();
   });
 })();
 
-//////////////////////////////////////////////// Routing /////////////////////////////////////////
+//////////////////////////////////////////////// Routing ////////////////////////////////////////////////
 
 // index page
 app.get('/', (req, res) => {
@@ -43,6 +48,18 @@ app.get('/event', async (req, res) => {
   try {
     // Calls get event type function
     const data = await getEventType();
+    res.json(data);
+
+    // Catch error
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+app.get('/count', async (req, res) => {
+  try {
+    // Calls get event type function
+    const data = await countEventTypes();
     res.json(data);
 
     // Catch error
