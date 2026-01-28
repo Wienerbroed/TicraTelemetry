@@ -44,7 +44,7 @@ const payloadByEventType = async () => {
                 as: "item",
                 cond: {
                   $not: {
-                    $in: ["$$item.k", ["className", "object", "Application Title", "classname"]]
+                    $in: ["$$item.k", ["className", "object", "Application Title", "classname", "name"]]
                   }
                 }
               }

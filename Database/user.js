@@ -67,7 +67,7 @@ const actionsByUsers = async () => {
   try {
     const result = await eventTypeCollection.aggregate([
       {
-        // Remove unwanted keys from payload BEFORE grouping
+        // Remove unwanted keys from payload before grouping
         $addFields: {
           normalizedPayload: {
             $arrayToObject: {
@@ -76,7 +76,7 @@ const actionsByUsers = async () => {
                 as: "item",
                 cond: {
                   $and: [
-                    { $not: { $in: ["$$item.k", ["className", "object", "Application Title", "classname"]] } },
+                    { $not: { $in: ["$$item.k", ["className", "object", "Application Title", "classname", "name"]] } },
                     { $ne: [{ $type: "$$item.v" }, "object"] }
                   ]
                 }
@@ -122,5 +122,65 @@ const actionsByUsers = async () => {
 };
 
 
+// Calculates time spent on eventtype for each user
+const userTimeExpenditureByPayload = async () => {
+  try {
+    // Fetch events sorted by user and timestamp
+    const events = await eventTypeCollection
+      .find({ user_name: { $exists: true } }, {
+        projection: {
+          _id: 0,
+          user_name: 1,
+          event_type: 1,
+          payload: 1,
+          time_stamp: 1,
+          event_number: 1
+        }
+      })
+      .sort({ user_name: 1, time_stamp: 1, event_number: 1 })
+      .toArray();
+
+    const result = [];
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const next = events[i + 1];
+
+      let time_spent = null;
+
+      if (next && event.user_name === next.user_name) {
+        const currTime = new Date(event.time_stamp).getTime();
+        const nextTime = new Date(next.time_stamp).getTime();
+
+        // Calculate minutes difference
+        time_spent = (nextTime - currTime) / 60000;
+
+        // If next event number < current and timestamps differ => session ended
+        if (next.event_number < event.event_number && nextTime !== currTime) {
+          time_spent = "session ended";
+        }
+      } else {
+        // Last event for this user
+        time_spent = "session ended";
+      }
+
+      result.push({
+        user_name: event.user_name ?? "unknown",
+        event_type: event.event_type ?? "unknown",
+        event_number: event.event_number ?? null,
+        payload: event.payload ?? {},
+        time_stamp: event.time_stamp ?? null,
+        time_spent
+      });
+    }
+
+    return result;
+  } catch (err) {
+    console.error("Error fetching user time expenditure", err);
+    return [];
+  }
+};
+
+
 // Exports
-export { getUsers, actionsByUsers, userInteractionCount };
+export { getUsers, actionsByUsers, userInteractionCount, userTimeExpenditureByPayload };

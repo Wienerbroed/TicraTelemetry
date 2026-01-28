@@ -4,7 +4,7 @@ import express from 'express';
 import { connectDB } from './database/db.js';
 import { getEventType, countEventTypes } from './database/eventTypes.js';
 import { getPayload, payloadByEventType } from './database/payload.js';
-import { getUsers, userInteractionCount, actionsByUsers } from './database/user.js';
+import { getUsers, userInteractionCount, actionsByUsers, userTimeExpenditureByPayload } from './database/user.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -122,6 +122,20 @@ app.get('/userinteraction', async (req, res) => {
   try {
     // Calls get event type function
     const data = await actionsByUsers();
+    res.json(data);
+
+    // Catch error
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+
+// users type page
+app.get('/time', async (req, res) => {
+  try {
+    // Calls get event type function
+    const data = await userTimeExpenditureByPayload();
     res.json(data);
 
     // Catch error
