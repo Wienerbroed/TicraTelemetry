@@ -1,7 +1,10 @@
 //////////////////////////////////////////////// Imports ////////////////////////////////////////////////
 import 'dotenv/config';
 import express from 'express';
-import { connectDB, getFiveLatest, getEventType, countEventTypes, getPayload, payloadByEventType, getUsers, userInteractionCount, actionsByUsers } from './database/db.js';
+import { connectDB } from './database/db.js';
+import { getEventType, countEventTypes } from './database/eventTypes.js';
+import { getPayload, payloadByEventType } from './database/payload.js';
+import { getUsers, userInteractionCount, actionsByUsers } from './database/user.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 

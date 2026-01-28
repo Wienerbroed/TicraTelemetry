@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>User Payload Usage</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,6 +13,10 @@
 
     h1 {
       margin-bottom: 20px;
+    }
+
+    label {
+      margin-right: 10px;
     }
 
     .user-card {
@@ -32,16 +37,30 @@
       border: 1px solid #ddd;
       padding: 8px;
       text-align: left;
+      vertical-align: top;
     }
 
     th {
       background-color: #efefef;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 12px;
+      background: #f4f4f4;
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow: auto;
     }
   </style>
 </head>
 <body>
 
 <h1>User Payload Usage</h1>
+
 <label for="userSelect"><strong>Select User:</strong></label>
 <select id="userSelect">
   <option value="">-- All Users --</option>
@@ -54,17 +73,24 @@
 
   function formatPayload(value) {
     if (value === null) return 'null';
+
+    if (typeof value === 'object') {
+      return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
+    }
+
     if (typeof value === 'string') return `"${value}" (string)`;
     if (typeof value === 'number') return `${value} (number)`;
-    return `${String(value)} (${typeof value})`;
+    if (typeof value === 'boolean') return `${value} (boolean)`;
+
+    return String(value);
   }
 
-  function renderUsers(filterEventType = '') {
+  function renderUsers(filterUser = '') {
     const container = document.getElementById('users');
     container.innerHTML = '';
 
     usersData
-      .filter(user => !filterEventType || user.event_type === filterEventType)
+      .filter(user => !filterUser || user.event_type === filterUser)
       .forEach(user => {
         const card = document.createElement('div');
         card.className = 'user-card';
@@ -101,29 +127,31 @@
   }
 
   async function loadData() {
-    const response = await fetch('/userinteraction');
-    usersData = await response.json();
+    try {
+      const response = await fetch('/userinteraction');
+      usersData = await response.json();
 
-    const select = document.getElementById('userSelect');
+      const select = document.getElementById('userSelect');
 
-    usersData.forEach(user => {
-      const option = document.createElement('option');
-      option.value = user.event_type;
-      option.textContent = user.event_type;
-      select.appendChild(option);
-    });
+      usersData.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.event_type;
+        option.textContent = user.event_type;
+        select.appendChild(option);
+      });
 
-    select.addEventListener('change', e => {
-      renderUsers(e.target.value);
-    });
+      select.addEventListener('change', e => {
+        renderUsers(e.target.value);
+      });
 
-    renderUsers(); // show all by default
+      renderUsers(); // show all users by default
+    } catch (err) {
+      console.error('Failed to load data', err);
+    }
   }
 
   loadData();
 </script>
-
-
 
 </body>
 </html>

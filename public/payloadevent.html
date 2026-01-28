@@ -3,115 +3,146 @@
 <head>
   <meta charset="UTF-8">
   <title>Payloads by Event Type</title>
+
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 40px;
       background-color: #f9f9f9;
     }
+
     h1 {
       color: #333;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
+
+    label {
+      margin-right: 10px;
     }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px 12px;
-      text-align: left;
-    }
-    th {
-      background-color: #f0f0f0;
-    }
-    tr:nth-child(even) {
-      background-color: #fafafa;
-    }
+
     .event-type {
       margin-top: 30px;
       font-size: 1.2em;
       color: #444;
     }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background-color: #f0f0f0;
+    }
+
+    tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 12px;
+      background: #f4f4f4;
+      padding: 8px;
+      border-radius: 4px;
+      max-height: 300px;
+      overflow: auto;
+    }
   </style>
 </head>
 <body>
-  <h1>Payloads by Event Type</h1>
 
-    <label for="eventSelect"><strong>Select Event Type:</strong></label>
-    <select id="eventSelect">
-    <option value="">-- All Event Types --</option>
-    </select>
-  <div id="content"></div>
+<h1>Payloads by Event Type</h1>
 
-    <script>
-        let payloadData = [];
+<label for="eventSelect"><strong>Select Event Type:</strong></label>
+<select id="eventSelect">
+  <option value="">-- All Event Types --</option>
+</select>
 
-        function renderEvents(filterEventType = '') {
-            const container = document.getElementById('content');
-            container.innerHTML = '';
+<div id="content"></div>
 
-            payloadData
-            .filter(event => !filterEventType || event.event_type === filterEventType)
-            .forEach(event => {
-                const eventTitle = document.createElement('div');
-                eventTitle.className = 'event-type';
-                eventTitle.textContent = `Event Type: ${event.event_type}`;
-                container.appendChild(eventTitle);
+<script>
+  let payloadData = [];
 
-                const table = document.createElement('table');
+  function formatPayload(value) {
+    if (value === null) return 'null';
 
-                const header = table.insertRow();
-                header.insertCell().textContent = 'Payload';
-                header.insertCell().textContent = 'Count';
+    if (typeof value === 'object') {
+      return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
+    }
 
-                event.payloads.forEach(payloadObj => {
-                const row = table.insertRow();
+    if (typeof value === 'string') return `"${value}" (string)`;
+    if (typeof value === 'number') return `${value} (number)`;
+    if (typeof value === 'boolean') return `${value} (boolean)`;
 
-                let payloadValue;
-                if (payloadObj.payload === null) {
-                    payloadValue = 'null';
-                } else if (typeof payloadObj.payload === 'string') {
-                    payloadValue = `"${payloadObj.payload}"`;
-                } else {
-                    payloadValue = payloadObj.payload;
-                }
+    return String(value);
+  }
 
-                row.insertCell().textContent = payloadValue;
-                row.insertCell().textContent = payloadObj.count;
-                });
+  function renderEvents(filterEventType = '') {
+    const container = document.getElementById('content');
+    container.innerHTML = '';
 
-                container.appendChild(table);
-            });
-        }
+    payloadData
+      .filter(event => !filterEventType || event.event_type === filterEventType)
+      .forEach(event => {
+        const eventTitle = document.createElement('div');
+        eventTitle.className = 'event-type';
+        eventTitle.textContent = `Event Type: ${event.event_type}`;
+        container.appendChild(eventTitle);
 
-        async function loadPayloadData() {
-            try {
-            const response = await fetch('/payloadevent');
-            payloadData = await response.json();
+        const table = document.createElement('table');
 
-            const select = document.getElementById('eventSelect');
+        const header = table.insertRow();
+        header.insertCell().textContent = 'Payload';
+        header.insertCell().textContent = 'Count';
 
-            payloadData.forEach(event => {
-                const option = document.createElement('option');
-                option.value = event.event_type;
-                option.textContent = event.event_type;
-                select.appendChild(option);
-            });
+        event.payloads.forEach(p => {
+          const row = table.insertRow();
+          row.insertCell().innerHTML = formatPayload(p.payload);
+          row.insertCell().textContent = p.count;
+        });
 
-            select.addEventListener('change', e => {
-                renderEvents(e.target.value);
-            });
+        container.appendChild(table);
+      });
+  }
 
-            renderEvents(); // show all by default
-            } catch (err) {
-            console.error('Error fetching payload data:', err);
-            document.getElementById('content').textContent = 'Failed to load data.';
-            }
-        }
+  async function loadPayloadData() {
+    try {
+      const response = await fetch('/payloadevent');
+      payloadData = await response.json();
 
-        loadPayloadData();
-    </script>
+      const select = document.getElementById('eventSelect');
+
+      payloadData.forEach(event => {
+        const option = document.createElement('option');
+        option.value = event.event_type;
+        option.textContent = event.event_type;
+        select.appendChild(option);
+      });
+
+      select.addEventListener('change', e => {
+        renderEvents(e.target.value);
+      });
+
+      renderEvents(); // show all by default
+    } catch (err) {
+      console.error('Error fetching payload data:', err);
+      document.getElementById('content').textContent = 'Failed to load data.';
+    }
+  }
+
+  loadPayloadData();
+</script>
 
 </body>
 </html>
+
