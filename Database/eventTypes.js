@@ -12,24 +12,6 @@ const eventTypeCollection = database.collection('gui_event');
 const eventTypes = [];
 
 
-// Fetch 5 latest from Mongodb
-const getFiveLatest = async () => {
-  try {
-    // Find elements and limits return to five with biggest id
-    return await eventTypeCollection
-      .find({})
-      .sort({ _id: -1 })
-      .limit(5)
-      .toArray();
-
-    // Error catch
-  } catch (err) {
-    console.error('Failed to fetch latest records:', err.message);
-    throw err;
-  }
-};
-
-
 // Fetch event types
 const getEventType = async () => {
   try {
@@ -47,7 +29,7 @@ const getEventType = async () => {
     console.error('No event-type found');
     throw err;
   }
-}
+};
 
 
 // Counts event types in db

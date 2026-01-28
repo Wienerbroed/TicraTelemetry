@@ -33,18 +33,6 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-// latest page
-app.get('/latest', async (req, res) => {
-  try {
-    // Calls get 5 latest and return in json format on page
-    const data = await getFiveLatest();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
 
 // event type page
 app.get('/event', async (req, res) => {
@@ -59,6 +47,7 @@ app.get('/event', async (req, res) => {
   }
 });
 
+
 app.get('/count', async (req, res) => {
   try {
     // Calls get event type function
@@ -70,6 +59,7 @@ app.get('/count', async (req, res) => {
     res.status(500).send('Error fetching data');
   }
 });
+
 
 // payload type page
 app.get('/payload', async (req, res) => {
@@ -83,6 +73,7 @@ app.get('/payload', async (req, res) => {
     res.status(500).send('Error fetching data');
   }
 });
+
 
 // payload type page
 app.get('/payloadevent', async (req, res) => {
@@ -111,6 +102,7 @@ app.get('/users', async (req, res) => {
   }
 });
 
+
 // users type page
 app.get('/usercount', async (req, res) => {
   try {
@@ -123,6 +115,7 @@ app.get('/usercount', async (req, res) => {
     res.status(500).send('Error fetching data');
   }
 });
+
 
 // users type page
 app.get('/userinteraction', async (req, res) => {
