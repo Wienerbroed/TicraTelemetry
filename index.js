@@ -5,6 +5,7 @@ import { connectDB } from './database/db.js';
 import { getEventType, countEventTypes } from './database/eventTypes.js';
 import { getPayload, payloadByEventType } from './database/payload.js';
 import { getUsers, userInteractionCount, actionsByUsers, userTimeExpenditureByPayload } from './database/user.js';
+import { timeSpendByEventType, clicksByOperation } from './database/datapool.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -141,5 +142,29 @@ app.get('/time', async (req, res) => {
     // Catch error
   } catch {
     res.status(500).send('Error fetching data');
+  }
+});
+
+// Time spent pr event data pool
+app.get('/pool', async (req, res) => {
+  try {
+    // Calls get event type function
+    const data = await timeSpendByEventType();
+    res.json(data);
+
+    // Catch error
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+// Clicks on create instances
+app.get("/create", async (req, res) => {
+  try {
+    const data = await clicksByOperation();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });

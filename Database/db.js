@@ -6,10 +6,11 @@ import { MongoClient } from 'mongodb';
 // Enviromental variables
 const username = encodeURIComponent(process.env.MONGO_USER);
 const password = encodeURIComponent(process.env.MONGO_PASSWORD);
+const dbUrl = encodeURIComponent(process.env.MONGODB_URL);
 
 
 // Database URL
-const uri = `mongodb+srv://${username}:${password}@telemetry.tgndpzv.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${username}:${password}@${dbUrl}/?retryWrites=true&w=majority`;
 
 
 // Attributes
