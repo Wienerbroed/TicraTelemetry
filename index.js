@@ -5,7 +5,7 @@ import { connectDB } from './database/db.js';
 import { getEventType, countEventTypes } from './database/eventTypes.js';
 import { getPayload, payloadByEventType } from './database/payload.js';
 import { getUsers, userInteractionCount, actionsByUsers, userTimeExpenditureByPayload } from './database/user.js';
-import { timeSpendByEventType, clicksByOperation } from './database/datapool.js';
+import { timeSpendByEventType, clicksByOperation, objectSelectionByGraspGuiStart } from './database/datapool.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -162,6 +162,18 @@ app.get('/pool', async (req, res) => {
 app.get("/create", async (req, res) => {
   try {
     const data = await clicksByOperation();
+    res.json(data);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Selection by graspGuiStart
+app.get("/graspStart", async (req, res) => {
+  try {
+    const data = await objectSelectionByGraspGuiStart();
     res.json(data);
   } catch (err) {
     console.error(err);
