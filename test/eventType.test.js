@@ -27,7 +27,7 @@ vi.mock('../database/db.js', () => ({
 }));
 
 // Production code import
-import { getEventType, countEventTypes } from '../database/eventTypes.js';
+import { getEventType } from '../database/eventTypes.js';
 
 describe('getEventType', () => {
   it('returns event types from mocked DB', async () => {
@@ -43,22 +43,5 @@ describe('getEventType', () => {
       "Tabpage",
       "Toggle Editor"
     ]);
-  });
-});
-
-describe('countEventTypes', () => {
-  it('counts event types correctly', async () => {
-    const result = await countEventTypes();
-    expect(result).toEqual({
-      "3D View": 1,
-      "Create": 2,
-      "GraspGUI End": 0,
-      "GraspGUI Start": 0,
-      "Object Tree": 0,
-      "Results": 0,
-      "SplashScreenWizard": 0,
-      "Tabpage": 0,
-      "Toggle Editor": 0
-    });
   });
 });

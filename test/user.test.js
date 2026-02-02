@@ -40,7 +40,7 @@ vi.mock('../database/db.js', () => ({
 }));
 
 // Import production code
-import { getUsers, userInteractionCount, actionsByUsers } from '../database/user.js';
+import { getUsers, } from '../database/user.js';
 
 describe('getUsers', () => {
   it('returns unique users from the mocked DB', async () => {
@@ -49,34 +49,3 @@ describe('getUsers', () => {
   });
 });
 
-describe('userInteractionCount', () => {
-  it('counts user interactions correctly', async () => {
-    const result = await userInteractionCount();
-    expect(result).toEqual({
-      Alice: 2,
-      Bob: 1,
-      Charlie: 1
-    });
-  });
-});
-
-describe('actionsByUsers', () => {
-  it('returns payloads grouped by user', async () => {
-    const result = await actionsByUsers();
-    expect(result).toEqual([
-      {
-        event_type: 'Create',
-        payloads: [
-          { payload: { action: 'click' }, count: 2 },
-          { payload: { action: 'drag' }, count: 1 }
-        ]
-      },
-      {
-        event_type: '3D View',
-        payloads: [
-          { payload: { action: 'rotate' }, count: 3 }
-        ]
-      }
-    ]);
-  });
-});

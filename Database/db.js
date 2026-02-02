@@ -46,5 +46,20 @@ const connectDB = async () => {
 };
 
 
+// Search Time interval 
+const timeIntervalFilter = (start, end) => {
+  if (!start && !end) return {};
+  const filter = {};
+  if (start) filter.$gte = new Date(start);
+  if (end) filter.$lte = new Date(end);
+  return { time_stamp: filter };
+};
+
+const employeeTypeFilter = employeeType => {
+  if (!employeeType) return {};
+  return { employee_type: employeeType };
+};
+
+
 // Exports
-export { connectDB };
+export { connectDB, timeIntervalFilter, employeeTypeFilter };

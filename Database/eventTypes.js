@@ -32,37 +32,5 @@ const getEventType = async () => {
 };
 
 
-// Counts event types in db
-const countEventTypes = async () => {
-  try {
-    // Load event types
-    const types = await getEventType();
-
-    // Sets event attribute
-    const events = await eventTypeCollection
-      .find({}, { projection: { event_type: 1 } })
-      .toArray();
-
-    // Counter
-    const counts = {};
-
-    // Initialize counters so menu order stays consistent
-    types.forEach(type => counts[type] = 0);
-
-    // Foreach loop to count event type instances
-    events.forEach(event => {
-      counts[event.event_type]++;
-    });
-
-    return counts;
-
-    // Error catch
-  } catch (err) {
-    console.error('No event types were found');
-    throw err;
-  }
-};
-
-
 // Exports
 export { getEventType, countEventTypes};

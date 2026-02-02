@@ -2,223 +2,284 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>GraspGUI Clicks by Selection</title>
+<title>GraspGUI Clicks</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
-    overflow-x: auto; /* allow scroll if many users */
-  }
-
-  table {
-    border-collapse: collapse;
-    width: auto;              /* content decides width */
-    text-align: center;
-  }
-
-  th, td {
-    border: 1px solid #ccc;
-    padding: 6px 10px;
-    vertical-align: middle;
-    white-space: nowrap;      /* fit content */
-  }
-
-  th {
-    background-color: #f0f0f0;
-  }
-
-  .chart-container {
-    width: 90px;
-    height: 90px;
-    display: block;
-    margin: auto;
-  }
-
-  .legend {
-    margin: 20px 0;
-  }
-
-  .legend-item {
-    display: inline-block;
-    margin-right: 15px;
-  }
-
-  .legend-color {
-    width: 15px;
-    height: 15px;
-    display: inline-block;
-    margin-right: 5px;
-    vertical-align: middle;
-  }
+  body { font-family: Arial, sans-serif; margin: 20px; overflow-x: auto; display: flex; flex-direction: column; align-items: center; }
+  table { border-collapse: collapse; width: 80%; max-width: 1000px; text-align: center; margin: 0 auto; }
+  th, td { border: 1px solid #ccc; padding: 6px 10px; white-space: nowrap; }
+  th { background-color: #f0f0f0; cursor: pointer; }
+  .legend { margin: 20px 0; text-align: center; }
+  .legend-item { display: inline-block; margin-right: 15px; }
+  .legend-color { width: 15px; height: 15px; display: inline-block; margin-right: 5px; vertical-align: middle; }
 </style>
 </head>
-
 <body>
 
-<h1>GraspGUI Clicks by Selection</h1>
+<h1>GraspGUI Clicks</h1>
+
+<div style="margin-bottom: 20px;">
+  <label>Start date: <input type="date" id="startDate"></label>
+  <label style="margin-left: 10px;">End date: <input type="date" id="endDate"></label>
+  <label style="margin-left: 10px;">Employee type: <select id="employeeType"></select></label>
+  <button style="margin-left: 10px;" onclick="applyFilters()">Apply</button>
+</div>
 
 <div class="legend" id="legend"></div>
 
 <table id="bigTable">
-  <thead>
-    <tr id="chartRow">
-      <th>Selection</th>
-    </tr>
-    <tr id="labelRow">
-      <th></th>
-    </tr>
-  </thead>
+  <thead></thead>
   <tbody></tbody>
 </table>
 
 <script>
+let FULL_EVENTS = [];
+let FILTERED_EVENTS = [];
+const COLORS = ['#4caf50','#2196f3','#ff9800','#f44336','#9c27b0','#00bcd4','#ffeb3b','#795548'];
+let currentSort = { col: null, asc: true };
+
+/* ---------- LOAD DATA ---------- */
 async function loadData() {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 10);
+  document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+  document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+
   const res = await fetch('/graspStart');
   const data = await res.json();
 
-  const users = Object.keys(data.perUser).sort();
-  const selections = data.averages.map(a => a.selection);
+  FULL_EVENTS = data.rawEvents;
 
-  const table = document.getElementById('bigTable');
-  const thead = table.querySelector('thead');
-  const tbody = table.querySelector('tbody');
+  buildEmployeeTypeFilter(FULL_EVENTS);
+  buildLegend(FULL_EVENTS);
 
-  thead.innerHTML = '';
+  // Initially, show all events
+  FILTERED_EVENTS = [...FULL_EVENTS];
+  renderFromEvents(FILTERED_EVENTS);
+}
+
+/* ---------- EMPLOYEE FILTER ---------- */
+function buildEmployeeTypeFilter(events) {
+  const select = document.getElementById('employeeType');
+  const types = [...new Set(events.map(e => e.employee_type).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">All</option>';
+  types.forEach(type => {
+    const opt = document.createElement('option');
+    opt.value = type;
+    opt.textContent = type;
+    select.appendChild(opt);
+  });
+}
+
+/* ---------- LEGEND ---------- */
+function buildLegend(events) {
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  const selections = [...new Set(events.map(e => e.selection))].sort((a,b)=>{
+    if(!isNaN(a) && !isNaN(b)) return Number(a)-Number(b);
+    return a.toString().localeCompare(b.toString());
+  });
+  selections.forEach((sel, i) => {
+    const div = document.createElement('div');
+    div.className = 'legend-item';
+    div.innerHTML = `<span class="legend-color" style="background-color:${COLORS[i % COLORS.length]}"></span>${sel}`;
+    legend.appendChild(div);
+  });
+}
+
+/* ---------- APPLY FILTERS ---------- */
+function applyFilters() {
+  const employeeType = document.getElementById('employeeType').value;
+  const startVal = document.getElementById('startDate').value;
+  const endVal = document.getElementById('endDate').value;
+
+  let filtered = FULL_EVENTS;
+
+  if (employeeType) filtered = filtered.filter(e => e.employee_type === employeeType);
+
+  const start = startVal ? new Date(startVal) : null;
+  const end = endVal ? new Date(endVal) : null;
+
+  filtered = filtered.filter(e => {
+    const d = new Date(e.time_stamp);
+    const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (start && dateOnly < start) return false;
+    if (end && dateOnly > end) return false;
+    return true;
+  });
+
+  FILTERED_EVENTS = filtered;
+  renderFromEvents(FILTERED_EVENTS);
+}
+
+/* ---------- RENDER TABLE ---------- */
+function renderFromEvents(events) {
+  const perUser = {};
+  const selections = [...new Set(FULL_EVENTS.map(e => e.selection))].sort((a,b)=>{
+    if(!isNaN(a) && !isNaN(b)) return Number(a)-Number(b);
+    return a.toString().localeCompare(b.toString());
+  });
+
+  // Build perUser with string keys
+  events.forEach(e=>{
+    if(!perUser[e.user]) perUser[e.user] = {};
+    const key = String(e.selection);
+    perUser[e.user][key] = (perUser[e.user][key] ?? 0) + 1;
+  });
+
+  drawTable(perUser, selections);
+}
+
+function drawTable(perUser, selections) {
+  const thead = document.querySelector('#bigTable thead');
+  const tbody = document.querySelector('#bigTable tbody');
+  thead.innerHTML = ''; 
   tbody.innerHTML = '';
 
-  const colors = [
-    '#4caf50', '#2196f3', '#ff9800', '#f44336',
-    '#9c27b0', '#00bcd4', '#ffeb3b', '#795548'
-  ];
+  // --- header ---
+  const trHead = document.createElement('tr');
+  trHead.appendChild(createHeader('User'));
+  selections.forEach(sel => trHead.appendChild(createHeader(sel)));
+  trHead.appendChild(createHeader('Diagram'));
+  thead.appendChild(trHead);
 
-  /* ---------- HEADER ---------- */
-  const headerRow = document.createElement('tr');
-  headerRow.appendChild(Object.assign(document.createElement('th'), { textContent: 'User' }));
+  // --- compute filtered TOTAL and AVERAGE ---
+  const totalFiltered = {};
+  const countFiltered = Object.keys(perUser).length;
+
   selections.forEach(sel => {
-    const th = document.createElement('th');
-    th.textContent = sel;
-    headerRow.appendChild(th);
+    totalFiltered[sel] = 0;
+    Object.values(perUser).forEach(userData => {
+      totalFiltered[sel] += userData[String(sel)] ?? 0;
+    });
   });
-  const pieTh = document.createElement('th');
-  pieTh.textContent = 'Distribution';
-  headerRow.appendChild(pieTh);
-  thead.appendChild(headerRow);
 
-  /* ---------- AVERAGE ROW (TOP) ---------- */
+  const avgFiltered = {};
+  selections.forEach(sel => {
+    avgFiltered[sel] = countFiltered ? totalFiltered[sel] / countFiltered : 0;
+  });
+
+  // --- total row ---
+  const trTotal = document.createElement('tr');
+  trTotal.appendChild(createCell('TOTAL', true));
+  selections.forEach(sel => trTotal.appendChild(createCell(totalFiltered[String(sel)] ?? 0, true)));
+  trTotal.appendChild(createDiagramCell(selections.map(sel => totalFiltered[String(sel)] ?? 0)));
+  tbody.appendChild(trTotal);
+
+  // --- average row ---
   const trAvg = document.createElement('tr');
-  const tdLabel = document.createElement('td');
-  tdLabel.textContent = 'Average';
-  tdLabel.style.fontWeight = 'bold';
-  trAvg.appendChild(tdLabel);
-
-  const avgData = selections.map(sel => {
-    const avgObj = data.averages.find(a => a.selection === sel);
-    const val = avgObj ? avgObj.avg_clicks_per_user : 0;
-    const td = document.createElement('td');
-    td.textContent = val.toFixed(2);
-    trAvg.appendChild(td);
-    return val;
-  });
-
-  /* ---------- Average Pie Chart ---------- */
-  const tdAvgPie = document.createElement('td');
-  const avgCanvas = document.createElement('canvas');
-  avgCanvas.width = 80;
-  avgCanvas.height = 80;
-  tdAvgPie.appendChild(avgCanvas);
-  trAvg.appendChild(tdAvgPie);
-
-  new Chart(avgCanvas, {
-    type: 'pie',
-    data: {
-      labels: selections,
-      datasets: [{
-        data: avgData,
-        backgroundColor: selections.map((_, i) => colors[i % colors.length])
-      }]
-    },
-    options: {
-      responsive: false,
-      maintainAspectRatio: true,
-      plugins: { legend: { display: false } },
-      animation: { duration: 0 }
-    }
-  });
-
+  trAvg.appendChild(createCell('AVERAGE', true));
+  selections.forEach(sel => trAvg.appendChild(createCell((avgFiltered[String(sel)] ?? 0).toFixed(2), true)));
+  trAvg.appendChild(createDiagramCell(selections.map(sel => avgFiltered[String(sel)] ?? 0)));
   tbody.appendChild(trAvg);
 
-  /* ---------- PER-USER ROWS ---------- */
+  // --- user rows ---
+  let users = Object.keys(perUser);
+
+
+    // ---------- COUNT WINNERS ----------
+  const winnerCount = {};
+  selections.forEach(s => winnerCount[s] = 0);
+
   users.forEach(user => {
+    const row = perUser[user];
+    let max = -1, winner = null;
+
+    selections.forEach(s => {
+      const v = row[s] ?? 0;
+      if (v > max) {
+        max = v;
+        winner = s;
+      }
+    });
+
+    if (winner !== null) winnerCount[winner]++;
+  });
+
+  // COUNTER (inserted under AVERAGE)
+  const trCounter = document.createElement('tr');
+  trCounter.appendChild(createCell('MOST USED',true));
+  selections.forEach(s => trCounter.appendChild(createCell(winnerCount[s],true)));
+  trCounter.appendChild(createCell(''));
+  tbody.appendChild(trCounter);
+  // SORTING
+  if(currentSort.col){
+    if(currentSort.col === 'User'){
+      users.sort((a,b)=>currentSort.asc ? a.localeCompare(b) : b.localeCompare(a));
+    } else {
+      users.sort((a,b)=>{
+        const aVal = Number(perUser[a][currentSort.col] ?? 0);
+        const bVal = Number(perUser[b][currentSort.col] ?? 0);
+        return currentSort.asc ? aVal - bVal : bVal - aVal;
+      });
+    }
+  } else users.sort();
+
+  // --- draw rows ---
+  users.forEach(user=>{
     const tr = document.createElement('tr');
+    tr.appendChild(createCell(user,false));
 
-    const tdUser = document.createElement('td');
-    tdUser.textContent = user;
-    tr.appendChild(tdUser);
+    const userData = perUser[user];
+    const rowMax = Math.max(...selections.map(sel => userData[String(sel)] ?? 0), 1);
+    const rowValues = [];
 
-    // --- Compute max for this row ---
-    const userValues = selections.map(sel => {
-      const obj = data.perUser[user].find(s => s.selection === sel);
-      return obj ? obj.clicks : 0;
-    });
-    const rowMax = Math.max(...userValues, 1); // avoid division by zero
-
-    // --- Fill user cells with heatmap ---
-    userValues.forEach((clicks, idx) => {
-      const td = document.createElement('td');
-      td.textContent = clicks;
-
-      // --- Heatmap: white → light green → dark green ---
-      const intensity = clicks / rowMax; // 0 → 1 for this row
-      let r, g, b;
-      if (intensity < 0.5) {
-        const t = intensity / 0.5;
-        r = Math.round(255 - t * (255 - 220));
-        g = Math.round(255 - t * (255 - 255));
-        b = Math.round(255 - t * (255 - 220));
-      } else {
-        const t = (intensity - 0.5) / 0.5;
-        r = Math.round(220 - t * (220 - 50));
-        g = Math.round(255 - t * (255 - 150));
-        b = Math.round(220 - t * (220 - 50));
-      }
-      td.style.backgroundColor = `rgb(${r},${g},${b})`;
-      td.style.color = 'black';
-      tr.appendChild(td);
+    selections.forEach(sel=>{
+      const val = userData[String(sel)] ?? 0;
+      rowValues.push(val);
+      const intensity = val / rowMax;
+      const green = Math.round(255 - intensity*100);
+      tr.appendChild(createCell(val,false,`rgb(${green},255,${green})`));
     });
 
-    /* ---------- Pie chart per user ---------- */
-    const tdPie = document.createElement('td');
-    const canvas = document.createElement('canvas');
-    canvas.width = 80;
-    canvas.height = 80;
-    tdPie.appendChild(canvas);
-    tr.appendChild(tdPie);
-
-    new Chart(canvas, {
-      type: 'pie',
-      data: {
-        labels: selections,
-        datasets: [{
-          data: userValues,
-          backgroundColor: selections.map((_, i) => colors[i % colors.length])
-        }]
-      },
-      options: {
-        responsive: false,
-        maintainAspectRatio: true,
-        plugins: { legend: { display: false } },
-        animation: { duration: 0 }
-      }
-    });
-
+    tr.appendChild(createDiagramCell(rowValues));
     tbody.appendChild(tr);
   });
 }
+
+/* ---------- HELPERS ---------- */
+function createHeader(name){
+  const th = document.createElement('th');
+  th.textContent = name;
+  th.onclick = () => sortBySelection(name);
+  return th;
+}
+
+function createCell(content,bold=false,bg=null){
+  const td = document.createElement('td');
+  td.textContent = content;
+  if(bold) td.style.fontWeight='bold';
+  if(bg) td.style.backgroundColor = bg;
+  return td;
+}
+
+function createDiagramCell(values){
+  const td = document.createElement('td');
+  const canvas = document.createElement('canvas'); canvas.width=80; canvas.height=80;
+  td.appendChild(canvas);
+  new Chart(canvas,{
+    type:'pie',
+    data:{labels:values.map((_,i)=>i), datasets:[{data:values, backgroundColor:COLORS}]},
+    options:{responsive:false, maintainAspectRatio:true, plugins:{legend:{display:false}}, animation:{duration:0}}
+  });
+  return td;
+}
+
+/* ---------- SORT ---------- */
+function sortBySelection(selection){
+  currentSort.col = String(selection); // always string for dynamic selections
+  if(currentSort.col === String(selection)){
+    currentSort.asc = !currentSort.asc;
+  } else {
+    currentSort.col = String(selection);
+    currentSort.asc = (selection==='User');
+    if(selection !== 'User') currentSort.asc = false;
+  }
+  renderFromEvents(FILTERED_EVENTS);
+}
+
 loadData();
 </script>
-
-
 </body>
 </html>

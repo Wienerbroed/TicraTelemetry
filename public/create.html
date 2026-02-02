@@ -2,176 +2,269 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Clicks by Operation </title>
+<title>Create interactions</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  table { border-collapse: collapse; width: 100%; text-align: center; table-layout: fixed; }
-  th, td { border: 1px solid #ccc; padding: 5px; vertical-align: top; }
-  th { background-color: #f0f0f0; }
-  .chart-container { width: 80px; height: 80px; margin: auto; }
-  .legend { margin: 20px 0; }
-  .legend-item { display: inline-block; margin-right: 15px; }
-  .legend-color { width: 15px; height: 15px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+body {
+  font-family: Arial;
+  margin: 20px;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+table {
+  border-collapse: collapse;
+  width: 80%;
+  max-width: 1000px;
+  text-align: center;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+th {
+  background-color: #f0f0f0;
+  cursor: pointer;
+}
+.legend {
+  margin: 20px 0;
+  text-align: center;
+}
+.legend-item {
+  display: inline-block;
+  margin-right: 15px;
+}
+.legend-color {
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+  margin-right: 5px;
+}
 </style>
 </head>
+
 <body>
-<h1>Clicks by Operation</h1>
+
+<h1>GraspGUI Clicks</h1>
+
+<div style="margin-bottom: 20px;">
+  <label>Start date: <input type="date" id="startDate"></label>
+  <label style="margin-left: 10px;">End date: <input type="date" id="endDate"></label>
+  <label style="margin-left: 10px;">Employee type:
+    <select id="employeeType"></select>
+  </label>
+  <button onclick="applyFilters()">Apply</button>
+</div>
 
 <div class="legend" id="legend"></div>
 
 <table id="bigTable">
-  <thead>
-    <tr id="chartRow">
-      <th>Operation</th>
-    </tr>
-    <tr id="labelRow">
-      <th></th>
-    </tr>
-  </thead>
+  <thead></thead>
   <tbody></tbody>
 </table>
 
 <script>
+let FULL_EVENTS = [];
+let FILTERED_EVENTS = [];
+const COLORS = ['#4caf50','#2196f3','#ff9800','#f44336','#9c27b0','#00bcd4','#ffeb3b','#795548'];
+let currentSort = { col: null, asc: true };
+
+// ---------- LOAD DATA ----------
 async function loadData() {
   const res = await fetch('/create');
   const data = await res.json();
 
-  const users = Object.keys(data.perUser).sort();
-  const operations = data.averages.map(a => a.operation);
+  FULL_EVENTS = data.rawEvents.map(doc => ({
+    user: doc.user_name ?? "unknown",
+    selection: doc.payload.operation ?? "unknown",
+    employee_type: doc.employee_type ?? "unknown",
+    time_stamp: doc.time_stamp
+  }));
 
-  const chartRow = document.getElementById('chartRow');
-  const labelRow = document.getElementById('labelRow');
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 10);
 
-  // ---------- Prepare colors ----------
-  const colors = ['#4caf50', '#2196f3', '#ff9800', '#f44336', '#9c27b0', '#00bcd4', '#ffeb3b', '#795548'];
+  document.getElementById('startDate').value ||= start.toISOString().split('T')[0];
+  document.getElementById('endDate').value ||= end.toISOString().split('T')[0];
 
-  // ---------- Generate legend ----------
-  const legendDiv = document.getElementById('legend');
-  legendDiv.innerHTML = '';
-  operations.forEach((op, i) => {
-    const item = document.createElement('div');
-    item.classList.add('legend-item');
-    const colorBox = document.createElement('span');
-    colorBox.classList.add('legend-color');
-    colorBox.style.backgroundColor = colors[i % colors.length];
-    item.appendChild(colorBox);
-    item.appendChild(document.createTextNode(op));
-    legendDiv.appendChild(item);
+  buildEmployeeTypeFilter(data.employeeTypes);
+  buildLegend(data.operations);
+
+  applyFilters();
+}
+
+// ---------- FILTERS ----------
+function buildEmployeeTypeFilter(types) {
+  const sel = document.getElementById('employeeType');
+  sel.innerHTML = '<option value="">All</option>';
+  types.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t;
+    o.textContent = t;
+    sel.appendChild(o);
+  });
+}
+
+function buildLegend(selections) {
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  selections.forEach((s,i) => {
+    const d = document.createElement('div');
+    d.className = 'legend-item';
+    d.innerHTML =
+      `<span class="legend-color" style="background:${COLORS[i % COLORS.length]}"></span>${s}`;
+    legend.appendChild(d);
+  });
+}
+
+// ---------- APPLY FILTERS ----------
+function applyFilters() {
+  const emp = employeeType.value;
+  const s = startDate.value;
+  const e = endDate.value;
+
+  FILTERED_EVENTS = FULL_EVENTS.filter(ev => {
+    if (emp && ev.employee_type !== emp) return false;
+    const t = new Date(ev.time_stamp);
+    if (s && t < new Date(s+'T00:00:00Z')) return false;
+    if (e && t > new Date(e+'T23:59:59Z')) return false;
+    return true;
   });
 
-  // ---------- Average column ----------
-  const avgCanvasTh = document.createElement('th');
-  const avgCanvas = document.createElement('canvas');
-  avgCanvas.classList.add('chart-container');
-  avgCanvasTh.appendChild(avgCanvas);
-  chartRow.appendChild(avgCanvasTh);
+  renderFromEvents(FILTERED_EVENTS);
+}
 
-  const avgLabelTh = document.createElement('th');
-  avgLabelTh.textContent = 'Average';
-  labelRow.appendChild(avgLabelTh);
+// ---------- RENDER ----------
+function renderFromEvents(events) {
+  const perUser = {};
+  const selections = [...new Set(FULL_EVENTS.map(e=>e.selection))];
 
-  const avgData = operations.map(op => {
-    const avgObj = data.averages.find(a => a.operation === op);
-    return avgObj ? parseFloat(avgObj.avg_clicks_per_user.toFixed(2)) : 0;
+  events.forEach(e => {
+    perUser[e.user] ??= {};
+    perUser[e.user][e.selection] = (perUser[e.user][e.selection] ?? 0) + 1;
   });
 
-  new Chart(avgCanvas.getContext('2d'), {
-    type: 'pie',
-    data: { labels: operations, datasets: [{ data: avgData, backgroundColor: operations.map((_, i) => colors[i % colors.length]) }] },
-    options: { plugins: { legend: { display: false } }, responsive: false, animation: { duration: 0 } }
-  });
+  drawTable(perUser, selections);
+}
 
-  // ---------- Calculate per-user max for heatmap ----------
-  const userMaxClicks = {};
-  users.forEach(user => {
-    const userData = (data.perUser[user] || []).map(opObj => opObj.clicks);
-    userMaxClicks[user] = userData.length ? Math.max(...userData) : 1; // avoid divide by zero
-  });
-
-  // ---------- User columns ----------
-  users.forEach((user, idx) => {
-    // Pie chart cell
-    const thChart = document.createElement('th');
-    const canvas = document.createElement('canvas');
-    canvas.classList.add('chart-container');
-    thChart.appendChild(canvas);
-    chartRow.appendChild(thChart);
-
-    // Label cell
-    const thLabel = document.createElement('th');
-    thLabel.textContent = user;
-    labelRow.appendChild(thLabel);
-
-    // Pie chart for user
-    const userData = operations.map(op => {
-      const userOps = data.perUser[user] || [];
-      const opObj = userOps.find(o => o.operation === op);
-      return opObj ? opObj.clicks : 0;
-    });
-
-    new Chart(canvas.getContext('2d'), {
-      type: 'pie',
-      data: { labels: operations, datasets: [{ data: userData, backgroundColor: operations.map((_, i) => colors[i % colors.length]) }] },
-      options: { plugins: { legend: { display: false } }, responsive: false, animation: { duration: 0 } }
-    });
-  });
-
-  // ---------- Build table body ----------
-  const tbody = document.querySelector('#bigTable tbody');
+// ---------- DRAW TABLE ----------
+function drawTable(perUser, selections) {
+  const thead = bigTable.querySelector('thead');
+  const tbody = bigTable.querySelector('tbody');
+  thead.innerHTML = '';
   tbody.innerHTML = '';
 
-  operations.forEach(op => {
-    const tr = document.createElement('tr');
+  // header
+  const h = document.createElement('tr');
+  h.appendChild(createHeader('User'));
+  selections.forEach(s => h.appendChild(createHeader(s)));
+  h.appendChild(createHeader('Diagram'));
+  thead.appendChild(h);
 
-    // Operation column
-    const tdOp = document.createElement('td');
-    tdOp.textContent = op;
-    tr.appendChild(tdOp);
+  // totals & averages
+  const totals = {};
+  selections.forEach(s => totals[s] = 0);
 
-    // Average column
-    const tdAvg = document.createElement('td');
-    const avgObj = data.averages.find(a => a.operation === op);
-    tdAvg.textContent = avgObj ? avgObj.avg_clicks_per_user.toFixed(2) : '0';
-    tr.appendChild(tdAvg);
+  Object.values(perUser).forEach(u =>
+    selections.forEach(s => totals[s] += (u[s] ?? 0))
+  );
 
-    // User columns with per-user dynamic heatmap
-    users.forEach(user => {
-      const td = document.createElement('td');
-      const userOps = data.perUser[user] || [];
-      const opObj = userOps.find(o => o.operation === op);
-      const clicks = opObj ? opObj.clicks : 0;
-      td.textContent = clicks;
+  const users = Object.keys(perUser);
+  const avg = {};
+  selections.forEach(s => avg[s] = users.length ? totals[s]/users.length : 0);
 
-      // ---------- Per-user normalized intensity ----------
-      const maxClicks = userMaxClicks[user];
-      const intensity = clicks / maxClicks; // 0 → 1 per user
+  // TOTAL
+  const trTotal = document.createElement('tr');
+  trTotal.appendChild(createCell('TOTAL',true));
+  selections.forEach(s => trTotal.appendChild(createCell(totals[s],true)));
+  trTotal.appendChild(createDiagramCell(selections.map(s=>totals[s])));
+  tbody.appendChild(trTotal);
 
-      // Interpolate white → light green → green
-      let r, g, b;
-      if (intensity < 0.5) {
-        const t = intensity / 0.5;
-        r = Math.round(255 - t * (255 - 220));
-        g = Math.round(255 - t * (255 - 255));
-        b = Math.round(255 - t * (255 - 220));
-      } else {
-        const t = (intensity - 0.5) / 0.5;
-        r = Math.round(220 - t * (220 - 150));
-        g = Math.round(255 - t * (255 - 230));
-        b = Math.round(220 - t * (220 - 150));
+  // AVERAGE
+  const trAvg = document.createElement('tr');
+  trAvg.appendChild(createCell('AVERAGE',true));
+  selections.forEach(s => trAvg.appendChild(createCell(avg[s].toFixed(2),true)));
+  trAvg.appendChild(createDiagramCell(selections.map(s=>avg[s])));
+  tbody.appendChild(trAvg);
+
+  // ---------- COUNT WINNERS ----------
+  const winnerCount = {};
+  selections.forEach(s => winnerCount[s] = 0);
+
+  users.forEach(user => {
+    const row = perUser[user];
+    let max = -1, winner = null;
+
+    selections.forEach(s => {
+      const v = row[s] ?? 0;
+      if (v > max) {
+        max = v;
+        winner = s;
       }
-
-      td.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-      td.style.color = 'black'; // always readable
-
-      tr.appendChild(td);
     });
 
+    if (winner !== null) winnerCount[winner]++;
+  });
+
+  // COUNTER (inserted under AVERAGE)
+  const trCounter = document.createElement('tr');
+  trCounter.appendChild(createCell('MOST USED',true));
+  selections.forEach(s => trCounter.appendChild(createCell(winnerCount[s],true)));
+  trCounter.appendChild(createCell(''));
+  tbody.appendChild(trCounter);
+
+  // ---------- USER ROWS ----------
+  users.sort().forEach(user => {
+    const tr = document.createElement('tr');
+    tr.appendChild(createCell(user));
+    const row = perUser[user];
+    const max = Math.max(...selections.map(s=>row[s] ?? 0),1);
+    const values = [];
+
+    selections.forEach(s => {
+      const v = row[s] ?? 0;
+      values.push(v);
+      const g = Math.round(255 - (v/max)*100);
+      tr.appendChild(createCell(v,false,`rgb(${g},255,${g})`));
+    });
+
+    tr.appendChild(createDiagramCell(values));
     tbody.appendChild(tr);
   });
 }
 
+// ---------- HELPERS ----------
+function createHeader(t){
+  const th=document.createElement('th');
+  th.textContent=t;
+  return th;
+}
+function createCell(v,b=false,bg=null){
+  const td=document.createElement('td');
+  td.textContent=v;
+  if(b) td.style.fontWeight='bold';
+  if(bg) td.style.background=bg;
+  return td;
+}
+function createDiagramCell(values){
+  const td=document.createElement('td');
+  const c=document.createElement('canvas');
+  c.width=80; c.height=80;
+  td.appendChild(c);
+  new Chart(c,{
+    type:'pie',
+    data:{datasets:[{data:values,backgroundColor:COLORS}]},
+    options:{responsive:false,plugins:{legend:{display:false}},animation:false}
+  });
+  return td;
+}
+
+// ---------- INIT ----------
 loadData();
 </script>
+
 </body>
 </html>

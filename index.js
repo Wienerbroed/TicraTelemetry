@@ -2,9 +2,8 @@
 import 'dotenv/config';
 import express from 'express';
 import { connectDB } from './database/db.js';
-import { getEventType, countEventTypes } from './database/eventTypes.js';
-import { getPayload, payloadByEventType } from './database/payload.js';
-import { getUsers, userInteractionCount, actionsByUsers, userTimeExpenditureByPayload } from './database/user.js';
+import { getEventType } from './database/eventTypes.js';
+import { getUsers } from './database/user.js';
 import { timeSpendByEventType, clicksByOperation, objectSelectionByGraspGuiStart } from './database/datapool.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
@@ -49,46 +48,6 @@ app.get('/event', async (req, res) => {
 });
 
 
-app.get('/count', async (req, res) => {
-  try {
-    // Calls get event type function
-    const data = await countEventTypes();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
-
-
-// payload type page
-app.get('/payload', async (req, res) => {
-  try {
-    // Calls get event type function
-    const data = await getPayload();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
-
-
-// payload type page
-app.get('/payloadevent', async (req, res) => {
-  try {
-    // Calls get event type function
-    const data = await payloadByEventType();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
-
 
 // users type page
 app.get('/users', async (req, res) => {
@@ -103,47 +62,6 @@ app.get('/users', async (req, res) => {
   }
 });
 
-
-// users type page
-app.get('/usercount', async (req, res) => {
-  try {
-    // Calls get event type function
-    const data = await userInteractionCount();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
-
-
-// users type page
-app.get('/userinteraction', async (req, res) => {
-  try {
-    // Calls get event type function
-    const data = await actionsByUsers();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
-
-
-// users type page
-app.get('/time', async (req, res) => {
-  try {
-    // Calls get event type function
-    const data = await userTimeExpenditureByPayload();
-    res.json(data);
-
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
 
 // Time spent pr event data pool
 app.get('/pool', async (req, res) => {
@@ -161,7 +79,14 @@ app.get('/pool', async (req, res) => {
 // Clicks on create instances
 app.get("/create", async (req, res) => {
   try {
-    const data = await clicksByOperation();
+    const { startTime, endTime, employeeType } = req.query;
+
+    const data = await clicksByOperation({
+      startTime,
+      endTime,
+      employeeType
+    });
+
     res.json(data);
   } catch (err) {
     console.error(err);
@@ -170,11 +95,19 @@ app.get("/create", async (req, res) => {
 });
 
 
+
 // Selection by graspGuiStart
 app.get("/graspStart", async (req, res) => {
   try {
-    const data = await objectSelectionByGraspGuiStart();
-    res.json(data);
+    const { startTime, endTime, employeeType } = req.query;
+
+    const data = await objectSelectionByGraspGuiStart({
+      startTime,
+      endTime,
+      employeeType
+    });
+
+    res.json(data); // rawEvents + total + average
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
