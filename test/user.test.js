@@ -42,9 +42,13 @@ vi.mock('../database/db.js', () => ({
 // Import production code
 import { getUsers, } from '../database/user.js';
 
+// getUsers test
 describe('getUsers', () => {
   it('returns unique users from the mocked DB', async () => {
+    
+    // runs getUsers
     const result = await getUsers();
+    // Expected outcome
     expect(result).toEqual(['Alice', 'Bob', 'Charlie']);
   });
 });

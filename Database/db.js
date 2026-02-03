@@ -1,5 +1,4 @@
-//////////////////////////////////////////// Imports ////////////////////////////////////////////
-import e from 'express';
+// imports
 import { MongoClient } from 'mongodb';
 
 
@@ -35,10 +34,8 @@ const connectDB = async () => {
     db = client.db('gui_event_db');
     console.log('MongoDB Atlas connected');
 
-    // Return db
     return db;
 
-    // Error catch
   } catch (err) {
     console.error('MongoDB connection failed:', err.message);
     process.exit(1);
@@ -48,15 +45,24 @@ const connectDB = async () => {
 
 // Search Time interval 
 const timeIntervalFilter = (start, end) => {
+
   if (!start && !end) return {};
+
   const filter = {};
+
+  //Filter with mongoDb queries
   if (start) filter.$gte = new Date(start);
   if (end) filter.$lte = new Date(end);
+  
   return { time_stamp: filter };
 };
 
+
+// Search employee type
 const employeeTypeFilter = employeeType => {
+
   if (!employeeType) return {};
+  
   return { employee_type: employeeType };
 };
 

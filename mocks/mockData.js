@@ -1,3 +1,4 @@
+// Data for mockdb used in testing
 const mockEvents = [
   {
     user_name: "Adrian Hobson",

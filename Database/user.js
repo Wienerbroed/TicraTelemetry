@@ -23,7 +23,6 @@ const getUsers = async () => {
 
     return userList;
 
-    // Error catch
   } catch (err) {
     console.error('No users found', err.message);
     throw err;

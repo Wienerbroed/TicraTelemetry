@@ -1,6 +1,8 @@
+//
 const getByPath = (obj, path) =>
   path.split(".").reduce((acc, key) => acc?.[key], obj);
 
+// 
 const matchesQuery = (doc, query = {}) =>
   Object.entries(query).every(([key, condition]) => {
     const value = getByPath(doc, key);
@@ -9,10 +11,11 @@ const matchesQuery = (doc, query = {}) =>
       if ("$exists" in condition) return condition.$exists ? value !== undefined : value === undefined;
       return false;
     }
-    return value === condition;
-  });
+  return value === condition;
+});
 
-export const createMockDb = (data = []) => ({
+//
+const createMockDb = (data = []) => ({
   find(query = {}) {
     const filtered = data.filter(doc => matchesQuery(doc, query));
 
@@ -32,3 +35,5 @@ export const createMockDb = (data = []) => ({
 });
 
 
+//Exports
+export { createMockDb };

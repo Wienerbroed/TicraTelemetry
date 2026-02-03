@@ -1,167 +1,114 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { createMockDb } from "../mocks/mockDb.js";
-import { mockEvents } from "../mocks/mockData.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-let dbCollection;
-
-// ------------------- functions -------------------
-
-export const timeSpendByEventType = async () => {
-  const events = await dbCollection
-    .find({ user_name: { $exists: true } })
-    .sort({ user_name: 1, time_stamp: 1, event_number: 1 })
-    .toArray();
-
-  const perUser = {};
-  const pooled = {};
-
-  for (let i = 0; i < events.length; i++) {
-    const curr = events[i];
-    const next = events[i + 1];
-
-    let time_spent = 0;
-    if (next && curr.user_name === next.user_name) {
-      const currTime = new Date(curr.time_stamp).getTime();
-      const nextTime = new Date(next.time_stamp).getTime();
-      if (nextTime > currTime && next.event_number >= curr.event_number) {
-        time_spent = (nextTime - currTime) / 60000;
-      }
+vi.mock("../database/db.js", () => {
+  // Example mock data
+  const mockEvents = [
+    {
+      _id: { $oid: "696fc5f967cc1e4bded4499d" },
+      application_name: "TICRA Tools",
+      event_number: 1,
+      event_type: "Create",
+      payload: { classname: "cad_aperture", operation: "new menu" },
+      session_id: "67279642-9c71-4fea-b0ea-d15543008780",
+      time_stamp: "2026-01-20T18:14:17.449Z",
+      user_name: "Bianca Webster",
+      employee_type: "unknown"
+    },
+    {
+      _id: { $oid: "696fc5f967cc1e4bded4499e" },
+      application_name: "TICRA Tools",
+      event_number: 2,
+      event_type: "Create",
+      payload: { classname: "cad_aperture", operation: "new menu" },
+      session_id: "67279642-9c71-4fea-b0ea-d15543008780",
+      time_stamp: "2026-01-20T18:24:17.449Z",
+      user_name: "Bianca Webster",
+      employee_type: "unknown"
+    },
+    {
+      _id: { $oid: "696fc5f967cc1e4bded4499f" },
+      application_name: "TICRA Tools",
+      event_number: 3,
+      event_type: "GraspGUI Start",
+      payload: { objectsExplorerSelection: "123" },
+      session_id: "67279642-9c71-4fea-b0ea-d15543008780",
+      time_stamp: "2026-01-20T18:30:17.449Z",
+      user_name: "Bianca Webster",
+      employee_type: "unknown"
+    },
+    {
+      _id: { $oid: "696fc5f967cc1e4bded4499g" },
+      application_name: "TICRA Tools",
+      event_number: 4,
+      event_type: "GraspGUI Start",
+      payload: { objectsExplorerSelection: "123" },
+      session_id: "67279642-9c71-4fea-b0ea-d15543008780",
+      time_stamp: "2026-01-20T18:40:17.449Z",
+      user_name: "Alice Smith",
+      employee_type: "unknown"
     }
+  ];
 
-    const eventType = curr.event_type ?? "unknown";
-    const user = curr.user_name;
+  const mockCollection = {
+    find: vi.fn(() => mockCollection),
+    sort: vi.fn(() => mockCollection),
+    toArray: vi.fn(async () => mockEvents)
+  };
 
-    if (!perUser[user]) perUser[user] = [];
-    perUser[user].push({ event_type: eventType, time_spent });
+  return {
+    connectDB: vi.fn(async () => ({
+      collection: () => mockCollection
+    })),
+    timeIntervalFilter: vi.fn(() => ({})),
+    employeeTypeFilter: vi.fn(() => ({}))
+  };
+});
 
-    if (!pooled[eventType]) pooled[eventType] = { total_time: 0, users: new Set() };
-    pooled[eventType].total_time += time_spent;
-    pooled[eventType].users.add(user);
-  }
 
-  const averages = Object.entries(pooled).map(([event_type, data]) => ({
-    event_type,
-    avg_time_spent: data.users.size === 0 ? 0 : data.total_time / data.users.size
-  }));
+import {
+  timeSpendByEventType,
+  clicksByOperation,
+  objectSelectionByGraspGuiStart
+} from "../database/datapool.js";
 
-  return { perUser, averages };
-};
-
-const formatSelectionLabel = v => v;
-const timeIntervalFilter = () => ({});
-const employeeTypeFilter = () => ({});
-
-export const clicksByOperation = async () => {
-  const rawEvents = await dbCollection.find({ event_type: "Create" }).toArray();
-
-  const perUser = {};
-  const operationSet = new Set();
-  const employeeTypeSet = new Set();
-
-  rawEvents.forEach(doc => {
-    const user = doc.user_name ?? "unknown";
-    const op = formatSelectionLabel(doc.payload.operation);
-    const type = doc.employee_type ?? "unknown";
-
-    operationSet.add(op);
-    employeeTypeSet.add(type);
-
-    if (!perUser[user]) perUser[user] = [];
-    const existing = perUser[user].find(s => s.selection === op);
-    if (existing) existing.clicks += 1;
-    else perUser[user].push({ selection: op, clicks: 1, employee_type: type });
-  });
-
-  const operations = Array.from(operationSet).sort();
-  const employeeTypes = Array.from(employeeTypeSet).sort();
-
-  const totals = {};
-  operations.forEach(op => {
-    totals[op] = Object.values(perUser).reduce((sum, userOps) => {
-      const obj = userOps.find(s => s.selection === op);
-      return sum + (obj ? obj.clicks : 0);
-    }, 0);
-  });
-
-  const averages = {};
-  operations.forEach(op => {
-    averages[op] = Object.keys(perUser).length ? parseFloat((totals[op] / Object.keys(perUser).length).toFixed(2)) : 0;
-  });
-
-  return { perUser, operations, totals, averages, employeeTypes, rawEvents };
-};
-
-export const objectSelectionByGraspGuiStart = async () => {
-  const selections = await dbCollection.find({ event_type: "GraspGUI Start" }).toArray();
-
-  const rawEvents = selections.map(doc => {
-    let sel = doc.payload.objectsExplorerSelection;
-    if (sel === null || sel === undefined) sel = null;
-    else if (!isNaN(sel)) sel = Number(sel);
-    else sel = String(sel);
-
-    return {
-      user: doc.user_name ?? "unknown",
-      employee_type: doc.employee_type ?? "unknown",
-      selection: sel,
-      time_stamp: doc.time_stamp
-    };
-  });
-
-  const total = {};
-  const perUser = {};
-  rawEvents.forEach(e => {
-    if (!perUser[e.user]) perUser[e.user] = [];
-    const existing = perUser[e.user].find(s => s.selection === e.selection);
-    if (existing) existing.clicks++;
-    else perUser[e.user].push({ selection: e.selection, clicks: 1 });
-    total[e.selection] = (total[e.selection] || 0) + 1;
-  });
-
-  const userCount = Object.keys(perUser).length || 1;
-  const average = {};
-  Object.keys(total).forEach(sel => {
-    average[sel] = total[sel] / userCount;
-  });
-
-  return { rawEvents, total, average };
-};
-
-// ------------------- tests -------------------
-
-describe("analytics functions with mock db", () => {
-  beforeEach(() => {
-    dbCollection = createMockDb(mockEvents);
-  });
-
-  it("timeSpendByEventType returns correct per-user and averages", async () => {
+describe("datapool functions with mock DB", () => {
+  
+  it("calculates time spent by event type", async () => {
     const result = await timeSpendByEventType();
+    
+    // We have two users, Bianca and Alice, two event types
+    expect(result.perUser["Bianca Webster"].length).toBeGreaterThan(0);
+    expect(result.perUser["Alice Smith"].length).toBeGreaterThan(0);
 
-    const adrianTimes = result.perUser["Adrian Hobson"].map(e => e.time_spent);
-    expect(adrianTimes.length).toBe(3); // number of events
-    expect(adrianTimes[0]).toBeCloseTo(1.05, 5); // minutes between 1st & 2nd
-    expect(adrianTimes[1]).toBeCloseTo(2.5, 5);  // minutes between 2nd & 3rd
-    expect(adrianTimes[2]).toBe(0);              // last event has no next
+    const avgCreate = result.averages.find(a => a.event_type === "Create");
+    expect(avgCreate).toBeDefined();
+    expect(avgCreate.avg_time_spent).toBeGreaterThan(0);
+  });
 
-    const createAverage = result.averages.find(a => a.event_type === "Create").avg_time_spent;
-    expect(createAverage).toBeCloseTo(3.55, 5);  // updated
-    });
-
-  it("clicksByOperation returns correct counts and totals", async () => {
+  it("counts clicks by operation", async () => {
     const result = await clicksByOperation();
 
-    // Only Adrian Hobson has two Create events
-    expect(result.operations.sort()).toEqual(["edit menu", "new menu"]);
-    expect(result.totals).toEqual({ "edit menu": 1, "new menu": 1 });
-    expect(result.averages).toEqual({ "edit menu": 1, "new menu": 1 }); // one user
-    expect(result.perUser["Adrian Hobson"].map(e => e.clicks).reduce((a,b)=>a+b,0)).toBe(2);
+    // Check totals for operation
+    expect(result.totals['"new menu"']).toBe(2);
+
+    // Check averages
+    expect(result.averages['"new menu"']).toBeCloseTo(1, 1); // 2 clicks / 2 users
   });
 
-  it("objectSelectionByGraspGuiStart returns correct totals and averages", async () => {
+  it("pools object selections for GraspGUI Start", async () => {
     const result = await objectSelectionByGraspGuiStart();
 
-    expect(result.rawEvents[0].selection).toBe("elementA");
-    expect(result.total).toEqual({ elementA: 1 });
-    expect(result.average).toEqual({ elementA: 1 }); // only 1 user
+    // Check totals
+    expect(result.total[123]).toBe(2); // 123 appears twice
+
+    // Check average per user
+    const userCount = Object.keys(result.rawEvents.reduce((acc, e) => {
+      acc[e.user] = true;
+      return acc;
+    }, {})).length;
+
+    expect(result.average[123]).toBeCloseTo(1, 1); // 2 / 2 users
   });
+
 });
+

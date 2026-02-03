@@ -29,9 +29,14 @@ vi.mock('../database/db.js', () => ({
 // Production code import
 import { getEventType } from '../database/eventTypes.js';
 
+// getEventType test
 describe('getEventType', () => {
   it('returns event types from mocked DB', async () => {
+    
+    // runs getEventType
     const result = await getEventType();
+
+    // Expected result
     expect(result).toEqual([
       "3D View",
       "Create",

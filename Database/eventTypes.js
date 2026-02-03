@@ -1,3 +1,4 @@
+// imports
 import { connectDB } from "./db.js";
 
 // Set attribute for connected database
@@ -18,13 +19,11 @@ const getEventType = async () => {
     // Calls all event types but only saves unique event types
     const distinctEventTypes = await eventTypeCollection.distinct('event_type');
 
-    // push event types to array
+    // add event types to array
     eventTypes.push(...distinctEventTypes);
 
-    // returns array
     return eventTypes;
 
-    // Error catch
   } catch (err) {
     console.error('No event-type found');
     throw err;
