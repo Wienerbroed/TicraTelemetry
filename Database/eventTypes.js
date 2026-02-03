@@ -33,4 +33,4 @@ const getEventType = async () => {
 
 
 // Exports
-export { getEventType, countEventTypes};
+export { getEventType };

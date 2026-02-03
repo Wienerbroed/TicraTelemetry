@@ -31,4 +31,4 @@ const getUsers = async () => {
 }
 
 // Exports
-export { getUsers, actionsByUsers, userInteractionCount, userTimeExpenditureByPayload };
+export { getUsers };
