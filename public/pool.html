@@ -1,74 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="stylesheet" href="styles/styles.css">
 <meta charset="UTF-8" />
 <title>Event Time Analytics</title>
-
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f6f7f9;
-        padding: 24px;
-    }
-
-    h1 {
-        margin-bottom: 8px;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        background: #fff;
-    }
-
-    th, td {
-        padding: 8px;
-        border-bottom: 1px solid #ddd;
-        text-align: center;
-        vertical-align: top;
-    }
-
-    th {
-        background: #f0f0f0;
-    }
-
-    td:first-child,
-    th:first-child {
-        text-align: left;
-        font-weight: bold;
-    }
-
-    canvas {
-        display: block;
-        margin: 6px auto 4px;
-    }
-
-    .legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin: 16px 0;
-    }
-
-    .legend-item {
-        display: flex;
-        align-items: center;
-        font-size: 13px;
-    }
-
-    .legend-color {
-        width: 14px;
-        height: 14px;
-        margin-right: 6px;
-        border-radius: 3px;
-    }
-
-    .muted {
-        color: #aaa;
-    }
-</style>
 </head>
 <body>
+     <header>
+        <div class="navbar">
+            <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
+            <a href="graspStart.html"> Grasp </a>
+            <a href="create.html"> Create </a>
+            <a href="pool.html"> Pool </a>
+        </div>
+    </header>   
 
 <h1>Time Spent by Event Type</h1>
 <p>Pies show % distribution • Cell color = relative time in that column</p>
@@ -217,5 +162,8 @@ function drawPie(id, data, colorMap) {
 loadData();
 </script>
 
+    <footer>
+        © TICRA foundation
+    </footer>
 </body>
 </html>

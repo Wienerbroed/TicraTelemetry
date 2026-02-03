@@ -27,6 +27,7 @@
     "@babel/core": "^7.28.6",
     "@babel/preset-env": "^7.28.6",
     "babel-jest": "^30.2.0",
+    "eslint": "^9.39.2",
     "jest": "^30.2.0",
     "vitest": "^4.0.18"
   }

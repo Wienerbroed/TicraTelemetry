@@ -1,51 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Create interactions</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-body {
-  font-family: Arial;
-  margin: 20px;
-  overflow-x: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-table {
-  border-collapse: collapse;
-  width: 80%;
-  max-width: 1000px;
-  text-align: center;
-}
-th, td {
-  border: 1px solid #ccc;
-  padding: 6px 10px;
-  white-space: nowrap;
-}
-th {
-  background-color: #f0f0f0;
-  cursor: pointer;
-}
-.legend {
-  margin: 20px 0;
-  text-align: center;
-}
-.legend-item {
-  display: inline-block;
-  margin-right: 15px;
-}
-.legend-color {
-  width: 15px;
-  height: 15px;
-  display: inline-block;
-  margin-right: 5px;
-}
-</style>
+  <link rel="stylesheet" href="styles/styles.css">
+  <meta charset="UTF-8">
+  <title>Create interactions</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
+<header>
+  <div class="navbar">
+    <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+    <a href="graspStart.html">Grasp</a>
+    <a href="pool.html">Pool</a>
+  </div>
+</header>
 
 <h1>GraspGUI Clicks</h1>
 
@@ -87,8 +56,8 @@ async function loadData() {
   const start = new Date();
   start.setDate(end.getDate() - 10);
 
-  document.getElementById('startDate').value ||= start.toISOString().split('T')[0];
-  document.getElementById('endDate').value ||= end.toISOString().split('T')[0];
+  startDate.value ||= start.toISOString().split('T')[0];
+  endDate.value ||= end.toISOString().split('T')[0];
 
   buildEmployeeTypeFilter(data.employeeTypes);
   buildLegend(data.operations);
@@ -98,18 +67,16 @@ async function loadData() {
 
 // ---------- FILTERS ----------
 function buildEmployeeTypeFilter(types) {
-  const sel = document.getElementById('employeeType');
-  sel.innerHTML = '<option value="">All</option>';
+  employeeType.innerHTML = '<option value="">All</option>';
   types.forEach(t => {
     const o = document.createElement('option');
     o.value = t;
     o.textContent = t;
-    sel.appendChild(o);
+    employeeType.appendChild(o);
   });
 }
 
 function buildLegend(selections) {
-  const legend = document.getElementById('legend');
   legend.innerHTML = '';
   selections.forEach((s,i) => {
     const d = document.createElement('div');
@@ -140,7 +107,7 @@ function applyFilters() {
 // ---------- RENDER ----------
 function renderFromEvents(events) {
   const perUser = {};
-  const selections = [...new Set(FULL_EVENTS.map(e=>e.selection))];
+  const selections = [...new Set(FULL_EVENTS.map(e => e.selection))];
 
   events.forEach(e => {
     perUser[e.user] ??= {};
@@ -157,14 +124,14 @@ function drawTable(perUser, selections) {
   thead.innerHTML = '';
   tbody.innerHTML = '';
 
-  // header
+  // HEADER
   const h = document.createElement('tr');
-  h.appendChild(createHeader('User'));
-  selections.forEach(s => h.appendChild(createHeader(s)));
+  h.appendChild(createHeader('User', 0));
+  selections.forEach((s,i) => h.appendChild(createHeader(s, i+1)));
   h.appendChild(createHeader('Diagram'));
   thead.appendChild(h);
 
-  // totals & averages
+  // TOTALS & AVERAGES
   const totals = {};
   selections.forEach(s => totals[s] = 0);
 
@@ -176,59 +143,53 @@ function drawTable(perUser, selections) {
   const avg = {};
   selections.forEach(s => avg[s] = users.length ? totals[s]/users.length : 0);
 
-  // TOTAL
+  // TOTAL ROW
   const trTotal = document.createElement('tr');
-  trTotal.appendChild(createCell('TOTAL',true));
-  selections.forEach(s => trTotal.appendChild(createCell(totals[s],true)));
-  trTotal.appendChild(createDiagramCell(selections.map(s=>totals[s])));
+  trTotal.appendChild(createCell('TOTAL', true));
+  selections.forEach(s => trTotal.appendChild(createCell(totals[s], true)));
+  trTotal.appendChild(createDiagramCell(selections.map(s => totals[s])));
   tbody.appendChild(trTotal);
 
-  // AVERAGE
+  // AVERAGE ROW
   const trAvg = document.createElement('tr');
-  trAvg.appendChild(createCell('AVERAGE',true));
-  selections.forEach(s => trAvg.appendChild(createCell(avg[s].toFixed(2),true)));
-  trAvg.appendChild(createDiagramCell(selections.map(s=>avg[s])));
+  trAvg.appendChild(createCell('AVERAGE', true));
+  selections.forEach(s => trAvg.appendChild(createCell(avg[s].toFixed(2), true)));
+  trAvg.appendChild(createDiagramCell(selections.map(s => avg[s])));
   tbody.appendChild(trAvg);
 
-  // ---------- COUNT WINNERS ----------
+  // MOST USED
   const winnerCount = {};
   selections.forEach(s => winnerCount[s] = 0);
 
   users.forEach(user => {
     const row = perUser[user];
     let max = -1, winner = null;
-
     selections.forEach(s => {
       const v = row[s] ?? 0;
-      if (v > max) {
-        max = v;
-        winner = s;
-      }
+      if (v > max) { max = v; winner = s; }
     });
-
-    if (winner !== null) winnerCount[winner]++;
+    if (winner) winnerCount[winner]++;
   });
 
-  // COUNTER (inserted under AVERAGE)
   const trCounter = document.createElement('tr');
-  trCounter.appendChild(createCell('MOST USED',true));
-  selections.forEach(s => trCounter.appendChild(createCell(winnerCount[s],true)));
+  trCounter.appendChild(createCell('MOST USED', true));
+  selections.forEach(s => trCounter.appendChild(createCell(winnerCount[s], true)));
   trCounter.appendChild(createCell(''));
   tbody.appendChild(trCounter);
 
-  // ---------- USER ROWS ----------
+  // USER ROWS
   users.sort().forEach(user => {
     const tr = document.createElement('tr');
     tr.appendChild(createCell(user));
     const row = perUser[user];
-    const max = Math.max(...selections.map(s=>row[s] ?? 0),1);
+    const max = Math.max(...selections.map(s => row[s] ?? 0), 1);
     const values = [];
 
     selections.forEach(s => {
       const v = row[s] ?? 0;
       values.push(v);
-      const g = Math.round(255 - (v/max)*100);
-      tr.appendChild(createCell(v,false,`rgb(${g},255,${g})`));
+      const g = Math.round(255 - (v / max) * 100);
+      tr.appendChild(createCell(v, false, `rgb(${g},255,${g})`));
     });
 
     tr.appendChild(createDiagramCell(values));
@@ -236,29 +197,71 @@ function drawTable(perUser, selections) {
   });
 }
 
+// ---------- SORTING ----------
+function sortColumn(colIndex) {
+  const tbody = bigTable.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+
+  const fixedRows = rows.slice(0, 3); // TOTAL, AVERAGE, MOST USED
+  const userRows = rows.slice(3);
+
+  const isNumeric = !isNaN(userRows[0].children[colIndex].textContent);
+
+  userRows.sort((a, b) => {
+    let A = a.children[colIndex].textContent;
+    let B = b.children[colIndex].textContent;
+
+    if (isNumeric) {
+      A = parseFloat(A) || 0;
+      B = parseFloat(B) || 0;
+    }
+
+    if (A < B) return currentSort.asc ? -1 : 1;
+    if (A > B) return currentSort.asc ? 1 : -1;
+    return 0;
+  });
+
+  if (currentSort.col === colIndex) currentSort.asc = !currentSort.asc;
+  else { currentSort.col = colIndex; currentSort.asc = true; }
+
+  tbody.innerHTML = '';
+  fixedRows.forEach(r => tbody.appendChild(r));
+  userRows.forEach(r => tbody.appendChild(r));
+}
+
 // ---------- HELPERS ----------
-function createHeader(t){
-  const th=document.createElement('th');
-  th.textContent=t;
+function createHeader(text, colIndex = null) {
+  const th = document.createElement('th');
+  th.textContent = text;
+
+  if (colIndex !== null) {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => sortColumn(colIndex));
+  }
   return th;
 }
-function createCell(v,b=false,bg=null){
-  const td=document.createElement('td');
-  td.textContent=v;
-  if(b) td.style.fontWeight='bold';
-  if(bg) td.style.background=bg;
+
+function createCell(v, bold=false, bg=null) {
+  const td = document.createElement('td');
+  td.textContent = v;
+  if (bold) td.style.fontWeight = 'bold';
+  if (bg) td.style.background = bg;
   return td;
 }
-function createDiagramCell(values){
-  const td=document.createElement('td');
-  const c=document.createElement('canvas');
-  c.width=80; c.height=80;
+
+function createDiagramCell(values) {
+  const td = document.createElement('td');
+  const c = document.createElement('canvas');
+  c.width = 80;
+  c.height = 80;
   td.appendChild(c);
-  new Chart(c,{
-    type:'pie',
-    data:{datasets:[{data:values,backgroundColor:COLORS}]},
-    options:{responsive:false,plugins:{legend:{display:false}},animation:false}
+
+  new Chart(c, {
+    type: 'pie',
+    data: { datasets: [{ data: values, backgroundColor: COLORS }] },
+    options: { responsive: false, plugins: { legend: { display: false } }, animation: false }
   });
+
   return td;
 }
 
@@ -266,5 +269,9 @@ function createDiagramCell(values){
 loadData();
 </script>
 
+<footer>
+  © TICRA foundation
+</footer>
 </body>
 </html>
+

@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="stylesheet" href="styles/styles.css">
 <meta charset="UTF-8">
 <title>GraspGUI Clicks</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; overflow-x: auto; display: flex; flex-direction: column; align-items: center; }
-  table { border-collapse: collapse; width: 80%; max-width: 1000px; text-align: center; margin: 0 auto; }
-  th, td { border: 1px solid #ccc; padding: 6px 10px; white-space: nowrap; }
-  th { background-color: #f0f0f0; cursor: pointer; }
-  .legend { margin: 20px 0; text-align: center; }
-  .legend-item { display: inline-block; margin-right: 15px; }
-  .legend-color { width: 15px; height: 15px; display: inline-block; margin-right: 5px; vertical-align: middle; }
-</style>
+
 </head>
+
 <body>
+  <header>
+    <div class="navbar">
+      <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
+      <a href="create.html"> Create </a>
+      <a href="pool.html"> Pool </a>
+    </div>
+  </header>
 
 <h1>GraspGUI Clicks</h1>
 
@@ -281,5 +282,8 @@ function sortBySelection(selection){
 
 loadData();
 </script>
+  <footer>
+    © TICRA foundation
+  </footer>
 </body>
 </html>
