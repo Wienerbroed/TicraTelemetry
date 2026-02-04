@@ -15,7 +15,9 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "lint": "eslint .",
+    "dev": "nodemon index.js",
     "test": "vitest"
   },
   "dependencies": {
@@ -30,6 +32,7 @@
     "babel-jest": "^30.2.0",
     "eslint": "^9.39.2",
     "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
     "vitest": "^4.0.18"
   }
 }

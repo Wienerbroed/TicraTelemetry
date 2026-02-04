@@ -15,13 +15,14 @@ app.use(express.static('public'));
 
 // Setup base elements for app
 (async () => {
-
-  // Calls db connection function
+  // DB connection
   await connectDB();
 
-  // Sets Port and returns port in console
+  // Port
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
+
+  // Start server
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
 })();
