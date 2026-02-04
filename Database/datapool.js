@@ -19,7 +19,6 @@ const formatSelectionLabel = value => {
 
 
 
-
 const timeSpendByEventType = async () => {
     try {
         // Calls database
@@ -171,38 +170,10 @@ const createClicksByOperation = async ({ startTime, endTime, employeeType } = {}
     const operations = Array.from(operationSet).sort();
     const employeeTypes = Array.from(employeeTypeSet).sort();
 
-    // Compute totals
-    const totals = {};
-    operations.forEach(op => {
-
-      totals[op] = Object.values(perUser).reduce((sum, userOps) => {
-        // Finds selection in user to add
-        const obj = userOps.find(s => s.selection === op);
-        
-        // returns total
-        return sum + (obj ? obj.clicks : 0);
-
-      }, 0);
-    });
-
-    // Compute averages
-    const averages = {};
-
-    // Looks for each operation
-    operations.forEach(op => {
-
-      // averages out by user lenght
-      averages[op] = Object.keys(perUser).length
-        ? parseFloat((totals[op] / Object.keys(perUser).length).toFixed(2))
-        : 0;
-    });
-
     // Data returned
     return {
       perUser,
       operations,
-      totals,
-      averages,
       employeeTypes,
       // time interval
       rawEvents 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../database/db.js", () => {
   // Example mock data
@@ -68,7 +68,8 @@ vi.mock("../database/db.js", () => {
 import {
   timeSpendByEventType,
   clicksByOperation,
-  objectSelectionByGraspGuiStart
+  objectSelectionByGraspGuiStart,
+  createClicksByOperation
 } from "../database/datapool.js";
 
 describe("datapool functions with mock DB", () => {
@@ -86,20 +87,28 @@ describe("datapool functions with mock DB", () => {
   });
 
   it("counts clicks by operation", async () => {
-    const result = await clicksByOperation();
+  const result = await createClicksByOperation();
 
-    // Check totals for operation
-    expect(result.totals['"new menu"']).toBe(2);
+  // Check that operations array includes the operation
+  expect(result.operations).toContain('"new menu"');
 
-    // Check averages
-    expect(result.averages['"new menu"']).toBeCloseTo(1, 1); // 2 clicks / 2 users
-  });
+  // Check that perUser has clicks counted correctly
+  expect(result.perUser["Bianca Webster"]).toBeDefined();
+  const biancaOps = result.perUser["Bianca Webster"];
+  const newMenuOp = biancaOps.find(o => o.selection === '"new menu"');
+  expect(newMenuOp).toBeDefined();
+  expect(newMenuOp.clicks).toBe(2);
+
+  // Check employee type is included
+  expect(newMenuOp.employee_type).toBe("unknown");
+});
+
 
   it("pools object selections for GraspGUI Start", async () => {
     const result = await objectSelectionByGraspGuiStart();
 
     // Check totals
-    expect(result.total[123]).toBe(2); // 123 appears twice
+    expect(result.total[123]).toBe(2);
 
     // Check average per user
     const userCount = Object.keys(result.rawEvents.reduce((acc, e) => {
@@ -107,7 +116,7 @@ describe("datapool functions with mock DB", () => {
       return acc;
     }, {})).length;
 
-    expect(result.average[123]).toBeCloseTo(1, 1); // 2 / 2 users
+    expect(result.average[123]).toBeCloseTo(1, 1); 
   });
 
 });
