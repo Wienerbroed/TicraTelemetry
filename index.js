@@ -4,7 +4,7 @@ import express from 'express';
 import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
 import { getUsers } from './database/user.js';
-import { timeSpendByEventType, clicksByOperation, objectSelectionByGraspGuiStart } from './database/datapool.js';
+import { timeSpendByEventType, createClicksByOperation, objectSelectionByGraspGuiStart } from './database/datapool.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -82,7 +82,7 @@ app.get("/create", async (req, res) => {
   try {
     const { startTime, endTime, employeeType } = req.query;
 
-    const data = await clicksByOperation({
+    const data = await createClicksByOperation({
       startTime,
       endTime,
       employeeType

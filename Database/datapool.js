@@ -110,7 +110,7 @@ const timeSpendByEventType = async () => {
 
 
 // Pool type of Create used
-const clicksByOperation = async ({ startTime, endTime, employeeType } = {}) => {
+const createClicksByOperation = async ({ startTime, endTime, employeeType } = {}) => {
   try {
     // Build query based on time interval and employee type
     const query = {
@@ -298,4 +298,4 @@ const objectSelectionByGraspGuiStart = async ({ startTime, endTime, employeeType
 
 
 // exports
-export { timeSpendByEventType, clicksByOperation, objectSelectionByGraspGuiStart };
+export { timeSpendByEventType, createClicksByOperation, objectSelectionByGraspGuiStart };

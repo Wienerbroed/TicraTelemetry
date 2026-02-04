@@ -5,6 +5,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding-top: 65px;
 }
 header {
     width: 100vw;
@@ -24,15 +25,16 @@ footer {
 }
 table {
   border-collapse: collapse;
-  width: 80%;
-  max-width: 1000px;
+  width: auto;
+  max-width: 95%;
   text-align: center;
   margin-bottom: 18px;
 }
 th, td {
   border: 1px solid #ccc;
-  padding: 6px 10px;
+  padding: 3px 6px;
   white-space: nowrap;
+  font-size: 12px;
 }
 th {
   background-color: #f0f0f0;
@@ -48,7 +50,6 @@ th {
 .navbar a{
     color: rgb(0, 0, 0);
     padding: 15px 20px;
-
 }
 .navbar img.nav-icon{
     max-width: 80px;
@@ -70,4 +71,8 @@ th {
   height: 15px;
   display: inline-block;
   margin-right: 5px;
+}
+table canvas {
+  width: 60px !important;
+  height: 60px !important;
 }
