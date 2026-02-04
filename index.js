@@ -1,4 +1,3 @@
-//////////////////////////////////////////////// Imports ////////////////////////////////////////////////
 import 'dotenv/config';
 import express from 'express';
 import { connectDB } from './database/db.js';
@@ -29,13 +28,13 @@ app.use(express.static('public'));
 
 //////////////////////////////////////////////// Routing ////////////////////////////////////////////////
 
-// index page
+
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
 
-// event type page
+
 app.get('/event', async (req, res) => {
   try {
     // Calls get event type function
@@ -50,7 +49,7 @@ app.get('/event', async (req, res) => {
 
 
 
-// users type page
+
 app.get('/users', async (req, res) => {
   try {
     // Calls get event type function
@@ -64,7 +63,7 @@ app.get('/users', async (req, res) => {
 });
 
 
-// Time spent pr event data pool
+
 app.get('/pool', async (req, res) => {
   try {
     // Calls get event type function
@@ -77,7 +76,7 @@ app.get('/pool', async (req, res) => {
   }
 });
 
-// Clicks on create instances
+
 app.get("/create", async (req, res) => {
   try {
     const { startTime, endTime, employeeType } = req.query;
@@ -97,7 +96,7 @@ app.get("/create", async (req, res) => {
 
 
 
-// Selection by graspGuiStart
+
 app.get("/graspStart", async (req, res) => {
   try {
     const { startTime, endTime, employeeType } = req.query;

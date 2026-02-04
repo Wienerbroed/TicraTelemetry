@@ -1,4 +1,3 @@
-// imports
 import { connectDB } from "./db.js";
 import { timeIntervalFilter, employeeTypeFilter } from "./db.js";
 
@@ -8,7 +7,7 @@ const database = await connectDB();
 // Set collection to fetch data from in database
 const dbCollection = database.collection('gui_event');
 
-// formats data to return correctly
+
 const formatSelectionLabel = value => {
 
   if (value === null) return "null";
@@ -18,7 +17,9 @@ const formatSelectionLabel = value => {
 };
 
 
-// Fetch and pool data by time spent on specific events
+
+
+
 const timeSpendByEventType = async () => {
     try {
         // Calls database
@@ -109,7 +110,7 @@ const timeSpendByEventType = async () => {
 };
 
 
-// Pool type of Create used
+
 const createClicksByOperation = async ({ startTime, endTime, employeeType } = {}) => {
   try {
     // Build query based on time interval and employee type
@@ -212,7 +213,7 @@ const createClicksByOperation = async ({ startTime, endTime, employeeType } = {}
   }
 };
 
-// Pool GraspUiStart by objectsExplorerSelection
+
 const objectSelectionByGraspGuiStart = async ({ startTime, endTime, employeeType } = {}) => {
   try {
 
@@ -297,5 +298,4 @@ const objectSelectionByGraspGuiStart = async ({ startTime, endTime, employeeType
 };
 
 
-// exports
 export { timeSpendByEventType, createClicksByOperation, objectSelectionByGraspGuiStart };

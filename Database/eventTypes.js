@@ -1,4 +1,3 @@
-// imports
 import { connectDB } from "./db.js";
 
 // Set attribute for connected database
@@ -13,7 +12,7 @@ const eventTypeCollection = database.collection('gui_event');
 const eventTypes = [];
 
 
-// Fetch event types
+
 const getEventType = async () => {
   try {
     // Calls all event types but only saves unique event types
@@ -31,5 +30,5 @@ const getEventType = async () => {
 };
 
 
-// Exports
+
 export { getEventType };

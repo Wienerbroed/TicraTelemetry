@@ -1,4 +1,3 @@
-// imports
 import { MongoClient } from 'mongodb';
 
 
@@ -43,7 +42,7 @@ const connectDB = async () => {
 };
 
 
-// Search Time interval 
+
 const timeIntervalFilter = (start, end) => {
 
   if (!start && !end) return {};
@@ -67,5 +66,5 @@ const employeeTypeFilter = employeeType => {
 };
 
 
-// Exports
+
 export { connectDB, timeIntervalFilter, employeeTypeFilter };
