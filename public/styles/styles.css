@@ -5,6 +5,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding-top: 65px;
 }
 header {
     width: 100vw;
@@ -24,18 +25,20 @@ footer {
 }
 table {
   border-collapse: collapse;
-  width: 80%;
-  max-width: 1000px;
+  width: auto;
+  max-width: 95%;
   text-align: center;
   margin-bottom: 18px;
 }
 th, td {
-  border: 1px solid #ccc;
-  padding: 6px 10px;
+  border: 2px solid #555;
+  padding: 1px 1px;
+  font-size: 12px;
+  text-align: center;
   white-space: nowrap;
 }
 th {
-  background-color: #f0f0f0;
+  background-color: #eee;
   cursor: pointer;
 }
 .navbar {
@@ -48,7 +51,6 @@ th {
 .navbar a{
     color: rgb(0, 0, 0);
     padding: 15px 20px;
-
 }
 .navbar img.nav-icon{
     max-width: 80px;
@@ -70,4 +72,51 @@ th {
   height: 15px;
   display: inline-block;
   margin-right: 5px;
+}
+table canvas {
+  width: 60px !important;
+  height: 60px !important;
+}
+#filters {
+  margin-bottom: 15px;
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+#tableContainer {
+  width: 100%;  
+  overflow-x: auto;  
+}
+
+/* Table inside container */
+#tableContainer table {
+  margin: 0 auto;    
+  min-width: 900px;   
+  table-layout: fixed; 
+}
+
+table#bigTable {
+  border-collapse: collapse;
+  min-width: 900px;
+  max-width: 90vw;
+  table-layout: fixed;
+}
+
+th.user-header, th.total-header {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  padding: 8px 14px;
+}
+
+#totalChartContainer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+tr.sortable:hover {
+  cursor: pointer;
+  background-color: #f0f0f0;
 }

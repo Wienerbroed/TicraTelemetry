@@ -1,52 +1,40 @@
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect } from "vitest";
 
-// Mock the database before importing eventTypes.js
-vi.mock('../database/db.js', () => ({
-  connectDB: async () => ({
-    collection: () => ({
-      distinct: async () => [
-        "3D View",
-        "Create",
-        "GraspGUI End",
-        "GraspGUI Start",
-        "Object Tree",
-        "Results",
-        "SplashScreenWizard",
-        "Tabpage",
-        "Toggle Editor"
-      ],
-      find: () => ({
-        toArray: async () => [
-          { event_type: "3D View" },
-          { event_type: "Create" },
-          { event_type: "Create" }
-        ]
-      })
+// Mock data and calls
+vi.mock("fs/promises", () => ({
+  readFile: vi.fn(async () =>
+    JSON.stringify({
+      GraspGuiStartExplorerSelection: {},
+      CreateEvents: {},
+      ToggleEditorEvents: {},
+      ExplorerEvents: {},
+      GraspGuiStartAppTitle: {}
     })
-  })
+  )
 }));
 
-// Production code import
-import { getEventType } from '../database/eventTypes.js';
 
-// getEventType test
-describe('getEventType', () => {
-  it('returns event types from mocked DB', async () => {
-    
-    // runs getEventType
+vi.mock("../database/db.js", () => ({
+  connectDB: vi.fn(async () => ({
+    collection: vi.fn()
+  }))
+}));
+
+
+import { getEventType } from "../database/eventTypes.js";
+
+
+// Tests
+describe("getEventType", () => {
+  it("returns event types from queries config", async () => {
     const result = await getEventType();
 
-    // Expected result
     expect(result).toEqual([
-      "3D View",
-      "Create",
-      "GraspGUI End",
-      "GraspGUI Start",
-      "Object Tree",
-      "Results",
-      "SplashScreenWizard",
-      "Tabpage",
-      "Toggle Editor"
+      "GraspGuiStartExplorerSelection",
+      "CreateEvents",
+      "ToggleEditorEvents",
+      "ExplorerEvents",
+      "GraspGuiStartAppTitle"
     ]);
   });
 });

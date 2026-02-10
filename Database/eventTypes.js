@@ -1,35 +1,33 @@
-// imports
 import { connectDB } from "./db.js";
+import { readFile } from "fs/promises";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
-// Set attribute for connected database
+// setup for json import
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const configPath = join(__dirname, "./config/queries.json");
+
+
+// Database logic
 const database = await connectDB();
 
-
-// Sets collection from database
 const eventTypeCollection = database.collection('gui_event');
 
 
-// Array for storing event types
+// Attributes
 const eventTypes = [];
 
 
-// Fetch event types
+// Functions
 const getEventType = async () => {
-  try {
-    // Calls all event types but only saves unique event types
-    const distinctEventTypes = await eventTypeCollection.distinct('event_type');
+  const data = await readFile(configPath, "utf-8");
 
-    // add event types to array
-    eventTypes.push(...distinctEventTypes);
+  const config = JSON.parse(data);
 
-    return eventTypes;
-
-  } catch (err) {
-    console.error('No event-type found');
-    throw err;
-  }
+  // Return config keys, not DB values
+  return Object.keys(config);
 };
 
 
-// Exports
 export { getEventType };

@@ -1,4 +1,3 @@
-// imports
 import { MongoClient } from 'mongodb';
 
 
@@ -43,22 +42,22 @@ const connectDB = async () => {
 };
 
 
-// Search Time interval 
-const timeIntervalFilter = (start, end) => {
 
+const timeIntervalFilter = (start, end) => {
   if (!start && !end) return {};
 
   const filter = {};
 
-  //Filter with mongoDb queries
-  if (start) filter.$gte = new Date(start);
-  if (end) filter.$lte = new Date(end);
+  // sets start date with mongoDb query
+  if (start) filter.$gte = start;
+  
+  // sets end date with mongoDb query
+  if (end) filter.$lte = end;
   
   return { time_stamp: filter };
 };
 
 
-// Search employee type
 const employeeTypeFilter = employeeType => {
 
   if (!employeeType) return {};
@@ -67,5 +66,5 @@ const employeeTypeFilter = employeeType => {
 };
 
 
-// Exports
+
 export { connectDB, timeIntervalFilter, employeeTypeFilter };

@@ -12,7 +12,7 @@ const eventTypeCollection = database.collection('gui_event');
 const userList = [];
 
 
-// Fetch users
+// Functions
 const getUsers = async () => {
   try {
     // Fetch unique users
@@ -29,5 +29,5 @@ const getUsers = async () => {
   }
 }
 
-// Exports
+
 export { getUsers };

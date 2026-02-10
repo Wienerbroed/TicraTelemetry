@@ -1,0 +1,27 @@
+# Git-related
+.git
+.gitignore
+
+# IDE / Editor files
+.vscode
+.idea
+
+# OS-specific junk
+**/.DS_Store
+Thumbs.db
+
+# Build artifacts
+**/bin
+**/obj
+*.exe
+*.out
+*.log
+
+# Temporary or cache files
+*.tmp
+*.swp
+
+# Docker-specific
+# Dockerfile
+.env
+.env.*
