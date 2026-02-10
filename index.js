@@ -3,7 +3,7 @@ import express from 'express';
 import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
 import { getUsers } from './database/user.js';
-import {  fetchDataPoolByQueries } from './database/datapool.js';
+import {  fetchDataPoolByQueries, sessionFetchByQueries } from './database/datapool.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -79,3 +79,20 @@ app.get("/data", async (req, res) => {
   }
 });
 
+
+
+app.get("/seesion", async(req, res) =>{
+  try{
+    const {startTime, endTime, user_name} = req.query;
+    const data = await sessionFetchByQueries({
+      startTime,
+      endTime,
+      user_name
+    });
+
+    res.json(data);
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+});

@@ -1,0 +1,16 @@
+{
+    "TabpageSessions": {
+        "query": {
+            "event_type": "Tabpage"
+        },
+        "fields": {
+            "_id": 0,
+            "time_stamp": 1,
+            "user_name": 1,
+            "event_number": 1,
+            "session_id": 1,
+            "payload.selected tab": 1
+            
+        }
+    }
+}
