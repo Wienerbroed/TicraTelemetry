@@ -1,6 +1,6 @@
 import { vi, describe, it, expect } from 'vitest';
 
-// Mock connectDB BEFORE importing the module
+// Mock data and calls
 vi.mock('../database/db.js', () => ({
   connectDB: async () => ({
     collection: () => ({
@@ -39,10 +39,11 @@ vi.mock('../database/db.js', () => ({
   })
 }));
 
-// Import production code
+
 import { getUsers, } from '../database/user.js';
 
-// getUsers test
+
+//tests
 describe('getUsers', () => {
   it('returns unique users from the mocked DB', async () => {
     

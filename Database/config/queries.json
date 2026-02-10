@@ -1,0 +1,70 @@
+{
+    "GraspGuiStartExplorerSelection": {
+        "query": {
+            "event_type": "GraspGUI Start"
+        },
+        "fields": {
+            "_id": 0,
+            "event_type": 1,
+            "time_stamp": 1,
+            "user_name": 1,
+            "employee_type": 1,
+            "payload.objectsExplorerSelection": 1
+            
+        }
+    },
+    "CreateEvents": {
+        "query": {
+            "event_type": "Create"
+        },
+        "fields": {
+            "_id": 0,
+            "event_type": 1,
+            "time_stamp": 1,
+            "user_name": 1,
+            "employee_type": 1,
+            "payload.operation": 1
+        }
+    },
+    "ToggleEditorEvents": {
+        "query": {
+            "event_type": "Toggle Editor"
+        },
+        "fields": {
+            "_id": 0,
+            "event_type": 1,
+            "time_stamp": 1,
+            "user_name": 1,
+            "employee_type": 1,
+            "payload.type": 1            
+        }
+    },
+    "ExplorerEvents": {
+        "query": {
+            "event_type": "Explorer"
+        },
+        "fields": {
+            "_id": 0,
+            "event_type": 1,
+            "time_stamp": 1,
+            "user_name": 1,
+            "employee_type": 1,
+            "payload.objectsExplorerSelection": 1 
+        }         
+    },
+    "GraspGuiStartAppTitle": {
+        "query": {
+            "event_type": "GraspGUI Start"
+        },
+        "fields": {
+            "_id": 0,
+            "event_type": 1,
+            "time_stamp": 1,
+            "user_name": 1,
+            "employee_type": 1,
+            "payload.Application Title": 1
+            
+        }
+    }
+}
+

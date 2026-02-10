@@ -3,7 +3,7 @@ import express from 'express';
 import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
 import { getUsers } from './database/user.js';
-import { timeSpendByEventType, createClicksByOperation, objectSelectionByGraspGuiStart } from './database/datapool.js';
+import {  fetchDataPoolByQueries } from './database/datapool.js';
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 
@@ -27,8 +27,6 @@ app.use(express.static('public'));
 })();
 
 //////////////////////////////////////////////// Routing ////////////////////////////////////////////////
-
-
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
@@ -41,12 +39,10 @@ app.get('/event', async (req, res) => {
     const data = await getEventType();
     res.json(data);
 
-    // Catch error
   } catch {
     res.status(500).send('Error fetching data');
   }
 });
-
 
 
 
@@ -56,7 +52,6 @@ app.get('/users', async (req, res) => {
     const data = await getUsers();
     res.json(data);
 
-    // Catch error
   } catch {
     res.status(500).send('Error fetching data');
   }
@@ -64,27 +59,17 @@ app.get('/users', async (req, res) => {
 
 
 
-app.get('/pool', async (req, res) => {
+app.get("/data", async (req, res) => {
   try {
-    // Calls get event type function
-    const data = await timeSpendByEventType();
-    res.json(data);
+    // set query for fontend
+    const { startTime, endTime, employeeType, inputEventType } = req.query;
 
-    // Catch error
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
-});
-
-
-app.get("/create", async (req, res) => {
-  try {
-    const { startTime, endTime, employeeType } = req.query;
-
-    const data = await createClicksByOperation({
+    // insert query values to backend
+    const data = await fetchDataPoolByQueries({
       startTime,
       endTime,
-      employeeType
+      employeeType,
+      inputEventType
     });
 
     res.json(data);
@@ -94,22 +79,3 @@ app.get("/create", async (req, res) => {
   }
 });
 
-
-
-
-app.get("/graspStart", async (req, res) => {
-  try {
-    const { startTime, endTime, employeeType } = req.query;
-
-    const data = await objectSelectionByGraspGuiStart({
-      startTime,
-      endTime,
-      employeeType
-    });
-
-    res.json(data); // rawEvents + total + average
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
