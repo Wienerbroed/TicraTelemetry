@@ -74,8 +74,8 @@ th {
   margin-right: 5px;
 }
 table canvas {
-  width: 60px !important;
-  height: 60px !important;
+  width: 60px;
+  height: 60px;
 }
 #filters {
   margin-bottom: 15px;
@@ -89,16 +89,15 @@ table canvas {
   overflow-x: auto;  
 }
 
-/* Table inside container */
 #tableContainer table {
   margin: 0 auto;    
-  min-width: 900px;   
+  min-width: 30px;   
   table-layout: fixed; 
 }
 
 table#bigTable {
   border-collapse: collapse;
-  min-width: 900px;
+  min-width: 30px;
   max-width: 90vw;
   table-layout: fixed;
 }
@@ -115,8 +114,33 @@ th.user-header, th.total-header {
   display: flex;
   justify-content: center;
 }
+.chart-container {
+  width: 80%;
+  max-width: 800px;
+  height: 300px;
+}
 
 tr.sortable:hover {
   cursor: pointer;
   background-color: #f0f0f0;
+}
+th.rotate {
+  padding: 0;
+  vertical-align: bottom; /* Align content to bottom of cell */
+}
+
+th.rotate > div {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+
+  display: inline-flex; /* inline-flex allows sizing based on content */
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 4px; /* adjust spacing */
+  box-sizing: border-box;
+
+  height: auto; /* allow height to grow with content */
+  min-height: 50px; /* optional: prevent it from being too small */
 }

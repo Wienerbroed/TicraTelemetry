@@ -13,6 +13,7 @@
   <header>
         <div class="navbar">
             <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
+            <a href="session.html">Sessions</a>
         </div>
   </header>
 
@@ -207,7 +208,7 @@ function drawTable(perUser, selections) {
 
     // Operation cell (truncate + tooltip)
     const opTd = document.createElement('td');
-    opTd.textContent = sel.length > 12 ? sel.slice(0,12) + '…' : sel;
+    opTd.textContent = sel;
     opTd.title = sel; // full text on hover
     opTd.classList.add('operation-cell');
     tr.appendChild(opTd);
@@ -269,7 +270,7 @@ function drawTotalChart(perUser, selections) {
   if (window.totalChartInstance) window.totalChartInstance.destroy();
 
   window.totalChartInstance = new Chart(ctx, {
-    type: 'pie',
+    type: 'bar',
     data: {
       labels: selections,
       datasets: [{ data: totals, backgroundColor: COLORS }]
