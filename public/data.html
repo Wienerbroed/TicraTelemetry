@@ -118,7 +118,7 @@ async function loadData() {
   // data handle
   FULL_EVENTS = data.events.map(ev => ({
     user: ev.user_name ?? "unknown",
-    selection: Object.values(ev.payload)[0] ?? "unknown",
+    selection: String(Object.values(ev.payload)[0] ?? "unknown"),  // <-- force string
     employee_type: ev.employee_type ?? "unknown",
     count: ev.count ?? 0
   }));
@@ -300,12 +300,11 @@ function createCell(v, bold = false, bg = null) {
 
 
 document.getElementById('applyButton').addEventListener('click', loadData);
-document.getElementById('startDate').addEventListener('change', loadData);
-document.getElementById('endDate').addEventListener('change', loadData);
+
 document.getElementById('eventType').addEventListener('change', () => {
   document.getElementById('employeeType').value = '';
-  loadData();
 });
+
 document.getElementById('employeeType').addEventListener('change', applyFilters);
 
 
