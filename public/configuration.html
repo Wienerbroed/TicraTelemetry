@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="styles/styles.css">
+    <header>
+        <div class="navbar">
+            <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
+            <a href="data.html"> Event DataPool </a>
+            <a href="session.html"> Sessions </a>
+        </div>
+    </header>
+<title>Configuration Manager</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #f7f7f7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px;
+    padding-top: 65px;
+  }
+
+  h1 {
+    color: #333;
+    text-align: center;
+  }
+
+  label {
+    font-weight: bold;
+    margin-top: 15px;
+    display: block;
+  }
+
+  select, input {
+    width: 300px;
+    padding: 8px;
+    margin: 5px 0 15px 0;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+
+  button {
+    padding: 8px 16px;
+    margin-right: 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #2f80ed;
+    color: white;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background-color: #1366d6;
+  }
+
+  .query {
+    background: white;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+    width: 350px;
+  }
+
+  .query strong {
+    color: #2f80ed;
+  }
+
+  .query button.update-btn {
+    background-color: #27ae60;
+  }
+
+  .query button.update-btn:hover {
+    background-color: #1e8449;
+  }
+
+  .form-container {
+    background: white;
+    padding: 20px;
+    border-radius: 6px;
+    width: 350px;
+    box-shadow: 0px 2px 10px rgba(0,0,0,0.1);
+    margin-top: 20px;
+    display: none;
+  }
+
+  .form-container button {
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Configuration Manager</h1>
+
+<label for="configSelect">Select Config File:</label>
+<select id="configSelect">
+  <option value="" disabled selected>-- Select a config file --</option>
+</select>
+
+<div id="queriesContainer"></div>
+
+<div class="form-container" id="formContainer">
+  <h2>Create / Update Query</h2>
+  <input type="text" id="title" placeholder="Query Title">
+  
+  <label for="eventTypeSelect">Event Type:</label>
+  <select id="eventTypeSelect">
+    <option value="" disabled selected>-- Select an event type --</option>
+  </select>
+
+  <input type="text" id="payloadPath" placeholder="Payload Path (e.g., g)">
+
+  <div>
+    <button id="createQuery">Create Query</button>
+    <button id="updateQuery" style="display:none;">Save Update</button>
+    <button id="clearForm" style="background-color:#999;">Clear</button>
+  </div>
+</div>
+
+<script>
+let currentUpdateKey = null;
+
+// Fetch event types for dropdown
+async function fetchEventTypes() {
+  const res = await fetch("/event");
+  const eventTypes = await res.json();
+  const select = document.getElementById("eventTypeSelect");
+  select.innerHTML = '<option value="" disabled selected>-- Select an event type --</option>';
+  select.innerHTML += eventTypes.map(e => `<option value="${e}">${e}</option>`).join("");
+}
+
+// Fetch config files
+async function fetchConfigFiles() {
+  const res = await fetch("/api/config-files");
+  const files = await res.json();
+  const select = document.getElementById("configSelect");
+  select.innerHTML = '<option value="" disabled selected>-- Select a config file --</option>';
+  select.innerHTML += files.map(f => `<option value="${f}">${f}</option>`).join("");
+}
+
+// Load queries for selected file
+async function loadQueries() {
+  const fileKey = document.getElementById("configSelect").value;
+  const container = document.getElementById("queriesContainer");
+  const formContainer = document.getElementById("formContainer");
+
+  if (!fileKey) {
+    container.innerHTML = "";
+    formContainer.style.display = "none";
+    return;
+  }
+
+  formContainer.style.display = "block";
+
+  const res = await fetch(`/api/${fileKey}/queries`);
+  const queries = await res.json();
+
+  container.innerHTML = Object.entries(queries).map(([key, value]) => `
+    <div class="query">
+      <strong>${key}</strong>: ${JSON.stringify(value.query)}
+      <div style="margin-top:10px;">
+        <button onclick="deleteQuery('${fileKey}', '${key}')">Delete</button>
+        <button class="update-btn" onclick='populateUpdate("${key}", "${value.query.event_type}", "${Object.keys(value.fields).filter(k=>!["_id","event_type","time_stamp","user_name","employee_type","event_number","session_id"].includes(k))[0] || ""}")'>Update</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+// Delete query
+async function deleteQuery(fileKey, key) {
+  if (!confirm(`Are you sure you want to delete "${key}"?`)) return;
+  await fetch(`/api/${fileKey}/queries/${key}`, { method: "DELETE" });
+  loadQueries();
+}
+
+// Populate update form
+function populateUpdate(key, eventType, payloadPath) {
+  currentUpdateKey = key;
+  document.getElementById("title").value = key;
+  document.getElementById("eventTypeSelect").value = eventType;
+  document.getElementById("payloadPath").value = payloadPath.replace(/^payload\./, ""); // remove payload. prefix for editing
+  document.getElementById("createQuery").style.display = "none";
+  document.getElementById("updateQuery").style.display = "inline-block";
+}
+
+// Clear form
+document.getElementById("clearForm").addEventListener("click", () => {
+  currentUpdateKey = null;
+  document.getElementById("title").value = "";
+  document.getElementById("eventTypeSelect").value = "";
+  document.getElementById("payloadPath").value = "";
+  document.getElementById("createQuery").style.display = "inline-block";
+  document.getElementById("updateQuery").style.display = "none";
+});
+
+// Add payload. prefix before sending
+function getNormalizedPayload() {
+  const input = document.getElementById("payloadPath").value.trim();
+  return input.startsWith("payload.") || !input ? input : `payload.${input}`;
+}
+
+// Create query
+document.getElementById("createQuery").addEventListener("click", async () => {
+  const fileKey = document.getElementById("configSelect").value;
+  const title = document.getElementById("title").value.trim();
+  const eventType = document.getElementById("eventTypeSelect").value;
+  const payloadPath = getNormalizedPayload();
+
+  if (!fileKey || !title || !eventType || !payloadPath) return alert("All fields are required");
+
+  await fetch(`/api/${fileKey}/queries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, eventType, payloadPath })
+  });
+
+  document.getElementById("clearForm").click();
+  loadQueries();
+});
+
+// Update query
+document.getElementById("updateQuery").addEventListener("click", async () => {
+  const fileKey = document.getElementById("configSelect").value;
+  const title = document.getElementById("title").value.trim();
+  const eventType = document.getElementById("eventTypeSelect").value;
+  const payloadPath = getNormalizedPayload();
+
+  if (!fileKey || !title || !eventType || !payloadPath || !currentUpdateKey) return alert("All fields are required");
+
+  await fetch(`/api/${fileKey}/queries/${currentUpdateKey}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, eventType, payloadPath })
+  });
+
+  document.getElementById("clearForm").click();
+  loadQueries();
+});
+
+document.getElementById("configSelect").addEventListener("change", loadQueries);
+
+// Initial fetch
+fetchEventTypes();
+fetchConfigFiles();
+</script>
+<footer>
+    © TICRA foundation
+</footer>
+</body>
+</html>

@@ -35,8 +35,7 @@
   <button type="submit">Apply</button>
 </form>
 
-<div id="tableContainer">
-</div>
+<div id="tableContainer"></div>
 
 <div id="totalChartContainer" class="chart-container">
   <canvas id="totalChart"></canvas>
@@ -61,6 +60,7 @@ function formatDateTimeLocal(date) {
 startInput.value = formatDateTimeLocal(tenDaysAgo);
 endInput.value = formatDateTimeLocal(now);
 
+// Load users into select
 async function loadUsers() {
   const res = await fetch("/users");
   const users = await res.json();
@@ -72,16 +72,19 @@ async function loadUsers() {
   });
 }
 
+// Sorting state
+let sortState = {};
+
+// Fetch sessions from server
 async function fetchSessions() {
   const selectedUser = employeeSelect.value || null;
-  let url = `/seesion?startTime=${encodeURIComponent(startInput.value)}&endTime=${encodeURIComponent(endInput.value)}`;
+  let url = `/session?startTime=${encodeURIComponent(startInput.value)}&endTime=${encodeURIComponent(endInput.value)}`;
   if (selectedUser) url += `&user_name=${encodeURIComponent(selectedUser)}`;
 
   const res = await fetch(url);
   const data = await res.json();
   const sessions = data.sessions || [];
 
-  // fetch individual session
   const perEmployee = {};
   if (!selectedUser) {
     sessions.forEach(s => {
@@ -96,16 +99,13 @@ async function fetchSessions() {
   renderSessionMatrix(perEmployee);
 }
 
-// Sorting state
-let sortState = {};
-
 // Table rendering
 function renderSessionMatrix(perEmployee) {
   container.querySelectorAll("table").forEach(t=>t.remove());
   const selectedUser = employeeSelect.value || null;
-  
-  // Sort logic
+
   if (!selectedUser) {
+    // Multi-user table
     const allTabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
     const employeeNames = Object.keys(perEmployee).sort();
     if (!employeeNames.length || !allTabs.length) {
@@ -118,7 +118,7 @@ function renderSessionMatrix(perEmployee) {
     const thead = document.createElement("thead");
     const tbody = document.createElement("tbody");
 
-    //first row
+    // Header row
     const headerRow = document.createElement("tr");
     headerRow.appendChild(createHeader("Tab"));
     employeeNames.forEach(user => {
@@ -129,8 +129,6 @@ function renderSessionMatrix(perEmployee) {
       th.appendChild(div);
       headerRow.appendChild(th);
     });
-
-    // total and average column
     ["TOTAL","AVERAGE"].forEach(label=>{
       const th = document.createElement("th");
       th.classList.add("rotate");
@@ -142,7 +140,7 @@ function renderSessionMatrix(perEmployee) {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // all tabs rules
+    // Rows for each tab
     allTabs.forEach(tab=>{
       const tr = document.createElement("tr");
       tr.classList.add("sortable");
@@ -160,13 +158,11 @@ function renderSessionMatrix(perEmployee) {
       tbody.appendChild(tr);
     });
 
-    // expand table
     table.appendChild(tbody);
     container.appendChild(table);
     tbody.querySelectorAll("tr.sortable").forEach(row=>row.addEventListener("click",()=>sortColumnsByRow(row, table)));
   } else {
-
-    // Singular employee table
+    // Single-user table
     const sessions = perEmployee[selectedUser];
     const sessionIds = [...new Set(sessions.map(s=>s.session_id))].sort();
     const tabs = [...new Set(sessions.map(s => s.tab))].sort();
@@ -190,8 +186,6 @@ function renderSessionMatrix(perEmployee) {
       th.appendChild(div);
       headerRow.appendChild(th);
     });
-
-    // Total and average
     ["TOTAL","AVERAGE"].forEach(label=>{
       const th = document.createElement("th");
       th.classList.add("rotate");
@@ -203,13 +197,7 @@ function renderSessionMatrix(perEmployee) {
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    const maxPerSession = {};
-    sessionIds.forEach(id=>{
-      const vals = sessions.filter(s=>s.session_id===id).map(s=>s.durationSeconds);
-      maxPerSession[id] = vals.length?Math.max(...vals):1;
-    });
-
-    // Rules for tabs
+    // Rows for each tab
     tabs.forEach(tab=>{
       const tr = document.createElement("tr");
       tr.dataset.tab = tab;
@@ -232,10 +220,10 @@ function renderSessionMatrix(perEmployee) {
   }
 
   applyColumnHeatmap();
-
   renderTotalChart(perEmployee);
 }
 
+// Sorting function
 function sortColumnsByRow(row, table){
   const tab = row.dataset.tab;
   if(!sortState[tab]) sortState[tab]=0;
@@ -260,10 +248,10 @@ function sortColumnsByRow(row, table){
 
   rows.forEach(r=>{
     const cells = Array.from(r.children);
-    const first=cells[0];
-    const lastTwo=cells.slice(-2);
-    const middle=sortedIndexes.map(i=>cells[i+1]);
-    r.innerHTML='';
+    const first = cells[0];
+    const lastTwo = cells.slice(-2);
+    const middle = sortedIndexes.map(i=>cells[i+1]);
+    r.innerHTML = "";
     r.appendChild(first);
     middle.forEach(c=>r.appendChild(c));
     lastTwo.forEach(c=>r.appendChild(c));
@@ -273,7 +261,7 @@ function sortColumnsByRow(row, table){
   const firstHeader = headerCells[0];
   const lastTwoHeader = headerCells.slice(-2);
   const middleHeader = sortedIndexes.map(i=>headerCells[i+1]);
-  header.innerHTML='';
+  header.innerHTML = "";
   header.appendChild(firstHeader);
   middleHeader.forEach(c=>header.appendChild(c));
   lastTwoHeader.forEach(c=>header.appendChild(c));
@@ -283,7 +271,7 @@ function sortColumnsByRow(row, table){
 function createHeader(text){ const th=document.createElement("th"); th.textContent=text; return th; }
 function createCell(value,bold=false){ const td=document.createElement("td"); td.textContent=value; if(bold) td.style.fontWeight='bold'; td.style.textAlign='center'; return td; }
 
-// Heatmap function
+// Heatmap
 function applyColumnHeatmap() {
     const table = container.querySelector("table");
     if (!table) return;
@@ -301,14 +289,14 @@ function applyColumnHeatmap() {
         rows.forEach(r => {
             const cell = r.children[col];
             const val = parseFloat(cell.textContent) || 0;
-            const intensity = maxVal ? val / maxVal : 0; // 0 to 1
+            const intensity = maxVal ? val / maxVal : 0;
             const lightGreen = Math.floor(255 - intensity * 155);
             cell.style.backgroundColor = `rgb(${lightGreen},255,${lightGreen})`;
         });
     }
 }
 
-// Chart.js bar chart
+// Chart.js
 let chartInstance = null;
 function getRandomColor() {
   const r = Math.floor(Math.random()*200)+30;
@@ -324,51 +312,35 @@ function renderTotalChart(perEmployee) {
   if (!selectedUser) {
     const tabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
     labels = tabs;
-    totals = tabs.map(tab => {
-      return Object.keys(perEmployee).reduce((sum, user) => {
-        const val = perEmployee[user].find(s => s.tab === tab)?.durationSeconds || 0;
-        return sum + val;
-      }, 0);
-    });
+    totals = tabs.map(tab => Object.keys(perEmployee).reduce((sum,user)=>{
+      const val = perEmployee[user].find(s=>s.tab===tab)?.durationSeconds||0;
+      return sum+val;
+    },0));
   } else {
     const sessions = perEmployee[selectedUser];
-    const tabs = [...new Set(sessions.map(s => s.tab))].sort();
+    const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
     labels = tabs;
-    totals = tabs.map(tab => sessions.filter(s => s.tab === tab).reduce((sum,s)=>sum+s.durationSeconds,0));
+    totals = tabs.map(tab => sessions.filter(s=>s.tab===tab).reduce((sum,s)=>sum+s.durationSeconds,0));
   }
 
   const ctx = document.getElementById('totalChart').getContext('2d');
-  if (chartInstance) chartInstance.destroy();
+  if(chartInstance) chartInstance.destroy();
   const colors = totals.map(_ => getRandomColor());
 
   chartInstance = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Total Duration',
-        data: totals,
-        backgroundColor: colors,
-        borderColor: colors,
-        borderWidth: 1
-      }]
-    },
+    data: { labels, datasets:[{label:'Total Duration', data:totals, backgroundColor:colors, borderColor:colors, borderWidth:1}] },
     options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        title: { display: true, text: 'Total Duration per Tab' }
-      },
-      scales: {
-        y: { beginAtZero: true },
-        x: {}
-      }
+      responsive:true,
+      plugins:{legend:{display:false},title:{display:true,text:'Total Duration per Tab'}},
+      scales:{y:{beginAtZero:true}, x:{}}
     }
   });
 }
 
 form.addEventListener("submit", e=>{ e.preventDefault(); fetchSessions(); });
 loadUsers();
+fetchSessions(); // load initial view
 </script>
 
 <footer>
