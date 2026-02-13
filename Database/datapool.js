@@ -33,7 +33,7 @@ const buildEventQueryConfig = async ({ inputEventType, startTime, endTime, emplo
     throw new Error(`Event type "${inputEventType}" not found in config`);
   }
 
-  // Extract payload field
+  
   const payloadFields = Object.keys(eventConfig.fields)
     .filter(f => f.startsWith("payload."));
 
@@ -44,7 +44,7 @@ const buildEventQueryConfig = async ({ inputEventType, startTime, endTime, emplo
   const payloadField = payloadFields[0];
   const payloadKey = payloadField.split(".").pop();
 
-  // Build match filter
+
   const matchFilter = {
     ...eventConfig.query,
     ...timeIntervalFilter(startTime, endTime),

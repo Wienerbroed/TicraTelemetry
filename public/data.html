@@ -60,7 +60,7 @@ const STATE = {
     rowSortStates: {}
 };
 
--
+
 setDefaultDateRange('startDate','endDate',10);
 
 
@@ -194,7 +194,7 @@ function cellColor(value,max){
     return `rgb(${g},255,${g})`;
 }
 
-// ----------------- CHART -----------------
+
 function drawChart(perUser,selections){
     const totals = selections.map(sel=>STATE.userOrder.reduce((sum,u)=>sum+(perUser[u]?.[sel]??0),0));
     renderBarChart(document.getElementById('totalChart'), selections, totals, COLORS, {plugins:{legend:{position:'bottom'}}, responsive:false, animation:false});
