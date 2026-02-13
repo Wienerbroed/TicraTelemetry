@@ -5,12 +5,13 @@
 <title>Session Viewer</title>
 <link rel="stylesheet" href="styles/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="module" src="scripts/utils.js"></script>
 </head>
 <body>
 
 <header>
     <div class="navbar">
-        <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
+        <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
         <a href="data.html">Datapool</a>
     </div>
 </header>
@@ -18,10 +19,12 @@
 <h1>Session Viewer</h1>
 
 <form id="sessionForm">
+  <label>Event Type:
+    <select id="eventTypeSelect"><option value="">Select Event Type</option></select>
+  </label>
+
   <label>Employee:
-    <select id="employeeSelect">
-      <option value="">All</option>
-    </select>
+    <select id="employeeSelect"><option value="">All</option></select>
   </label>
 
   <label>Start Time:
@@ -41,306 +44,199 @@
   <canvas id="totalChart"></canvas>
 </div>
 
-<script>
+<script type="module">
+import { 
+    setDefaultDateRange, fetchJson, createHeader, createCell, applyHeatmap, 
+    sortTableByRow, renderBarChart, populateDropdown 
+} from './scripts/utils.js';
+
+const eventTypeSelect = document.getElementById("eventTypeSelect");
 const employeeSelect = document.getElementById("employeeSelect");
 const startInput = document.getElementById("startTime");
 const endInput = document.getElementById("endTime");
 const form = document.getElementById("sessionForm");
-const container = document.getElementById("tableContainer");
-
-// Default last 10 days
-const now = new Date();
-const tenDaysAgo = new Date(now.getTime() - 10*24*60*60*1000);
-
-function formatDateTimeLocal(date) {
-  const pad = n => n.toString().padStart(2,'0');
-  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-startInput.value = formatDateTimeLocal(tenDaysAgo);
-endInput.value = formatDateTimeLocal(now);
-
-// Load users into select
-async function loadUsers() {
-  const res = await fetch("/users");
-  const users = await res.json();
-  users.forEach(name => {
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
-    employeeSelect.appendChild(option);
-  });
-}
-
-// Sorting state
+const tableContainer = document.getElementById("tableContainer");
+const totalChartCanvas = document.getElementById("totalChart");
 let sortState = {};
 
-// Fetch sessions from server
-async function fetchSessions() {
-  const selectedUser = employeeSelect.value || null;
-  let url = `/session?startTime=${encodeURIComponent(startInput.value)}&endTime=${encodeURIComponent(endInput.value)}`;
-  if (selectedUser) url += `&user_name=${encodeURIComponent(selectedUser)}`;
 
-  const res = await fetch(url);
-  const data = await res.json();
-  const sessions = data.sessions || [];
+setDefaultDateRange('startTime','endTime',10);
 
-  const perEmployee = {};
-  if (!selectedUser) {
-    sessions.forEach(s => {
-      const user = s.user_name || "Unknown";
-      if (!perEmployee[user]) perEmployee[user] = [];
-      perEmployee[user].push(s);
-    });
-  } else {
-    perEmployee[selectedUser] = sessions;
-  }
-
-  renderSessionMatrix(perEmployee);
+async function initDropdownsAndLoad() {
+    await populateDropdown('eventTypeSelect','/sessionTypes','Select Event Type');
+    await populateDropdown('employeeSelect','/users','All');
+    fetchSessions();
 }
 
-// Table rendering
-function renderSessionMatrix(perEmployee) {
-  container.querySelectorAll("table").forEach(t=>t.remove());
-  const selectedUser = employeeSelect.value || null;
+initDropdownsAndLoad();
 
-  if (!selectedUser) {
-    // Multi-user table
+
+form.addEventListener('submit', e=>{
+    e.preventDefault();
+    fetchSessions();
+});
+
+
+async function fetchSessions(){
+    const selectedEvent = eventTypeSelect.value;
+    if(!selectedEvent) return;
+
+    const selectedUser = employeeSelect.value || null;
+    let url = `/session?eventType=${encodeURIComponent(selectedEvent)}&startTime=${encodeURIComponent(startInput.value)}&endTime=${encodeURIComponent(endInput.value)}`;
+    if(selectedUser) url += `&user_name=${encodeURIComponent(selectedUser)}`;
+
+    const data = await fetchJson(url);
+    const sessions = data.sessions || [];
+
+    const perEmployee = {};
+    if(!selectedUser){
+        sessions.forEach(s=>{
+            const user = s.user_name || "Unknown";
+            if(!perEmployee[user]) perEmployee[user] = [];
+            perEmployee[user].push(s);
+        });
+    } else {
+        perEmployee[selectedUser] = sessions;
+    }
+
+    renderTable(perEmployee);
+    renderChart(perEmployee);
+}
+
+// ----------------- TABLE -----------------
+function renderTable(perEmployee){
+    tableContainer.innerHTML = "";
+    const selectedUser = employeeSelect.value || null;
+
+    if(!selectedUser) renderMultiUserTable(perEmployee);
+    else renderSingleUserTable(perEmployee[selectedUser]);
+
+    applyHeatmap("#tableContainer table");
+}
+
+function createRotatedHeader(text){
+    const th = document.createElement("th");
+    th.classList.add("rotate");
+    const div = document.createElement("div");
+    div.textContent = text;
+    th.appendChild(div);
+    return th;
+}
+
+function renderMultiUserTable(perEmployee){
     const allTabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
     const employeeNames = Object.keys(perEmployee).sort();
-    if (!employeeNames.length || !allTabs.length) {
-      container.innerHTML = "<p>No sessions found.</p>";
-      renderTotalChart(perEmployee);
-      return;
+    if(!allTabs.length || !employeeNames.length){
+        tableContainer.innerHTML="<p>No sessions found.</p>"; 
+        return;
     }
 
     const table = document.createElement("table");
     const thead = document.createElement("thead");
     const tbody = document.createElement("tbody");
 
-    // Header row
+    // Header
     const headerRow = document.createElement("tr");
     headerRow.appendChild(createHeader("Tab"));
-    employeeNames.forEach(user => {
-      const th = document.createElement("th");
-      th.classList.add("rotate");
-      const div = document.createElement("div");
-      div.textContent = user;
-      th.appendChild(div);
-      headerRow.appendChild(th);
-    });
-    ["TOTAL","AVERAGE"].forEach(label=>{
-      const th = document.createElement("th");
-      th.classList.add("rotate");
-      const div = document.createElement("div");
-      div.textContent = label;
-      th.appendChild(div);
-      headerRow.appendChild(th);
-    });
+    employeeNames.forEach(u => headerRow.appendChild(createRotatedHeader(u)));
+    ["TOTAL","AVERAGE"].forEach(label => headerRow.appendChild(createRotatedHeader(label)));
     thead.appendChild(headerRow);
-    table.appendChild(thead);
 
-    // Rows for each tab
+    // Rows
     allTabs.forEach(tab=>{
-      const tr = document.createElement("tr");
-      tr.classList.add("sortable");
-      tr.dataset.tab = tab;
-      tr.appendChild(createCell(tab));
-      let totalAcrossEmployees = 0;
-      employeeNames.forEach(user=>{
-        const val = (perEmployee[user].find(s=>s.tab===tab)?.durationSeconds)||0;
-        totalAcrossEmployees += val;
-        tr.appendChild(createCell(Math.round(val)));
-      });
-      tr.appendChild(createCell(Math.round(totalAcrossEmployees), true));
-      const avg = employeeNames.length ? (totalAcrossEmployees/employeeNames.length).toFixed(2) : 0;
-      tr.appendChild(createCell(avg, true));
-      tbody.appendChild(tr);
+        const tr = document.createElement("tr");
+        tr.dataset.tab = tab;
+        tr.classList.add('sortable');
+        tr.appendChild(createCell(tab));
+
+        let total=0;
+        employeeNames.forEach(u=>{
+            const val = perEmployee[u].find(s=>s.tab===tab)?.durationSeconds||0;
+            total+=val;
+            tr.appendChild(createCell(Math.round(val)));
+        });
+        tr.appendChild(createCell(Math.round(total),true));
+        tr.appendChild(createCell((total/employeeNames.length).toFixed(2),true));
+
+        tbody.appendChild(tr);
+        tr.addEventListener('click', ()=>sortTableByRow(table,tr,sortState));
     });
 
+    table.appendChild(thead);
     table.appendChild(tbody);
-    container.appendChild(table);
-    tbody.querySelectorAll("tr.sortable").forEach(row=>row.addEventListener("click",()=>sortColumnsByRow(row, table)));
-  } else {
-    // Single-user table
-    const sessions = perEmployee[selectedUser];
+    tableContainer.appendChild(table);
+}
+
+function renderSingleUserTable(sessions){
     const sessionIds = [...new Set(sessions.map(s=>s.session_id))].sort();
-    const tabs = [...new Set(sessions.map(s => s.tab))].sort();
-    if (!sessions.length) {
-      container.innerHTML = "<p>No sessions found for this employee.</p>";
-      renderTotalChart(perEmployee);
-      return;
+    const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
+    if(!sessions.length){
+        tableContainer.innerHTML="<p>No sessions found for this employee.</p>"; 
+        return;
     }
 
     const table = document.createElement("table");
     const thead = document.createElement("thead");
     const tbody = document.createElement("tbody");
 
+    // Header
     const headerRow = document.createElement("tr");
     headerRow.appendChild(createHeader("Tab"));
-    sessionIds.forEach(id=>{
-      const th = document.createElement("th");
-      th.classList.add("rotate");
-      const div = document.createElement("div");
-      div.textContent = id;
-      th.appendChild(div);
-      headerRow.appendChild(th);
-    });
-    ["TOTAL","AVERAGE"].forEach(label=>{
-      const th = document.createElement("th");
-      th.classList.add("rotate");
-      const div = document.createElement("div");
-      div.textContent = label;
-      th.appendChild(div);
-      headerRow.appendChild(th);
-    });
+    sessionIds.forEach(id => headerRow.appendChild(createRotatedHeader(id)));
+    ["TOTAL","AVERAGE"].forEach(label => headerRow.appendChild(createRotatedHeader(label)));
     thead.appendChild(headerRow);
-    table.appendChild(thead);
 
-    // Rows for each tab
+    // Rows
     tabs.forEach(tab=>{
-      const tr = document.createElement("tr");
-      tr.dataset.tab = tab;
-      tr.appendChild(createCell(tab));
-      let totalAcrossSessions = 0;
-      sessionIds.forEach(id=>{
-        const val = (sessions.find(s=>s.tab===tab && s.session_id===id)?.durationSeconds)||0;
-        totalAcrossSessions += val;
-        tr.appendChild(createCell(Math.round(val)));
-      });
-      tr.appendChild(createCell(Math.round(totalAcrossSessions), true));
-      const avg = sessionIds.length ? (totalAcrossSessions/sessionIds.length).toFixed(2) : 0;
-      tr.appendChild(createCell(avg, true));
-      tbody.appendChild(tr);
+        const tr = document.createElement("tr");
+        tr.dataset.tab = tab;
+        tr.appendChild(createCell(tab));
+
+        let total=0;
+        sessionIds.forEach(id=>{
+            const val = sessions.find(s=>s.tab===tab && s.session_id===id)?.durationSeconds||0;
+            total+=val;
+            tr.appendChild(createCell(Math.round(val)));
+        });
+        tr.appendChild(createCell(Math.round(total),true));
+        tr.appendChild(createCell((total/sessionIds.length).toFixed(2),true));
+
+        tbody.appendChild(tr);
+        tr.addEventListener('click', ()=>sortTableByRow(table,tr,sortState));
     });
 
+    table.appendChild(thead);
     table.appendChild(tbody);
-    container.appendChild(table);
-    tbody.querySelectorAll("tr").forEach(row=>row.addEventListener("click",()=>sortColumnsByRow(row, table)));
-  }
-
-  applyColumnHeatmap();
-  renderTotalChart(perEmployee);
+    tableContainer.appendChild(table);
 }
 
-// Sorting function
-function sortColumnsByRow(row, table){
-  const tab = row.dataset.tab;
-  if(!sortState[tab]) sortState[tab]=0;
-  sortState[tab] = (sortState[tab]+1)%3;
-  const state = sortState[tab];
-
-  const tbody = table.querySelector("tbody");
-  const rows = Array.from(tbody.querySelectorAll("tr"));
-  const header = table.querySelector("thead tr");
-  const totalCols = header.children.length;
-  const start=1,end=totalCols-2;
-
-  const values = Array.from(row.children).slice(start,end).map(td=>parseFloat(td.textContent));
-  let sortedIndexes = values.map((_,i)=>i);
-  if(state===1) sortedIndexes.sort((a,b)=>values[b]-values[a]);
-  if(state===2) sortedIndexes.sort((a,b)=>values[a]-values[b]);
-  if(state===0) sortedIndexes.sort((a,b)=>{
-    const labelA = header.children[a+1].textContent.toLowerCase();
-    const labelB = header.children[b+1].textContent.toLowerCase();
-    return labelA.localeCompare(labelB);
-  });
-
-  rows.forEach(r=>{
-    const cells = Array.from(r.children);
-    const first = cells[0];
-    const lastTwo = cells.slice(-2);
-    const middle = sortedIndexes.map(i=>cells[i+1]);
-    r.innerHTML = "";
-    r.appendChild(first);
-    middle.forEach(c=>r.appendChild(c));
-    lastTwo.forEach(c=>r.appendChild(c));
-  });
-
-  const headerCells = Array.from(header.children);
-  const firstHeader = headerCells[0];
-  const lastTwoHeader = headerCells.slice(-2);
-  const middleHeader = sortedIndexes.map(i=>headerCells[i+1]);
-  header.innerHTML = "";
-  header.appendChild(firstHeader);
-  middleHeader.forEach(c=>header.appendChild(c));
-  lastTwoHeader.forEach(c=>header.appendChild(c));
-}
-
-// Table helpers
-function createHeader(text){ const th=document.createElement("th"); th.textContent=text; return th; }
-function createCell(value,bold=false){ const td=document.createElement("td"); td.textContent=value; if(bold) td.style.fontWeight='bold'; td.style.textAlign='center'; return td; }
-
-// Heatmap
-function applyColumnHeatmap() {
-    const table = container.querySelector("table");
-    if (!table) return;
-    const tbody = table.querySelector("tbody");
-    const rows = Array.from(tbody.querySelectorAll("tr"));
-    if (!rows.length) return;
-
-    const colCount = rows[0].children.length;
-    const startCol = 1;
-    const endCol = colCount - 2;
-
-    for (let col = startCol; col < endCol; col++) {
-        const values = rows.map(r => parseFloat(r.children[col].textContent) || 0);
-        const maxVal = Math.max(...values);
-        rows.forEach(r => {
-            const cell = r.children[col];
-            const val = parseFloat(cell.textContent) || 0;
-            const intensity = maxVal ? val / maxVal : 0;
-            const lightGreen = Math.floor(255 - intensity * 155);
-            cell.style.backgroundColor = `rgb(${lightGreen},255,${lightGreen})`;
-        });
+// ----------------- CHART -----------------
+function renderChart(perEmployee){
+    const selectedUser = employeeSelect.value || null;
+    let labels=[], totals=[];
+    if(!selectedUser){
+        const tabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
+        labels = tabs;
+        totals = tabs.map(tab => Object.keys(perEmployee).reduce((sum,user) => sum + (perEmployee[user].find(s=>s.tab===tab)?.durationSeconds||0),0));
+    } else {
+        const sessions = perEmployee[selectedUser];
+        const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
+        labels = tabs;
+        totals = tabs.map(tab=>sessions.filter(s=>s.tab===tab).reduce((sum,s)=>sum+s.durationSeconds,0));
     }
+
+    // Random colors per bar
+    const colors = labels.map(_=>`rgb(${Math.random()*200},${Math.random()*200},${Math.random()*200})`);
+
+    renderBarChart(totalChartCanvas, labels, totals, colors, {
+        responsive:true,
+        plugins:{
+            legend:{display:false},
+            title:{display:true,text:'Total Duration per Tab'}
+        },
+        scales:{y:{beginAtZero:true}}
+    });
 }
-
-// Chart.js
-let chartInstance = null;
-function getRandomColor() {
-  const r = Math.floor(Math.random()*200)+30;
-  const g = Math.floor(Math.random()*200)+30;
-  const b = Math.floor(Math.random()*200)+30;
-  return `rgb(${r},${g},${b})`;
-}
-function renderTotalChart(perEmployee) {
-  const selectedUser = employeeSelect.value || null;
-  let labels = [];
-  let totals = [];
-
-  if (!selectedUser) {
-    const tabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
-    labels = tabs;
-    totals = tabs.map(tab => Object.keys(perEmployee).reduce((sum,user)=>{
-      const val = perEmployee[user].find(s=>s.tab===tab)?.durationSeconds||0;
-      return sum+val;
-    },0));
-  } else {
-    const sessions = perEmployee[selectedUser];
-    const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
-    labels = tabs;
-    totals = tabs.map(tab => sessions.filter(s=>s.tab===tab).reduce((sum,s)=>sum+s.durationSeconds,0));
-  }
-
-  const ctx = document.getElementById('totalChart').getContext('2d');
-  if(chartInstance) chartInstance.destroy();
-  const colors = totals.map(_ => getRandomColor());
-
-  chartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: { labels, datasets:[{label:'Total Duration', data:totals, backgroundColor:colors, borderColor:colors, borderWidth:1}] },
-    options: {
-      responsive:true,
-      plugins:{legend:{display:false},title:{display:true,text:'Total Duration per Tab'}},
-      scales:{y:{beginAtZero:true}, x:{}}
-    }
-  });
-}
-
-form.addEventListener("submit", e=>{ e.preventDefault(); fetchSessions(); });
-loadUsers();
-fetchSessions(); // load initial view
 </script>
 
 <footer>

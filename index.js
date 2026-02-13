@@ -2,34 +2,36 @@ import 'dotenv/config';
 import express from 'express';
 import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
+import { getSessionType } from './database/session.js';
 import { getUsers } from './database/user.js';
 import { fetchDataPoolByQueries, sessionFetchByQueries } from './database/datapool.js';
 import { appendJson, deleteJson, updateJson } from './database/config/configManager.js';
-
+import { getEventQueries } from './database/eventQueries.js';
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs/promises";
 
 //////////////////////////////////////////////// App setup ////////////////////////////////////////////////
-
 const app = express();
+
 
 // Middleware to parse JSON bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static frontend
+
 app.use(express.static('public'));
 
-// __dirname setup for ES Modules
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// JSON config files mapping
+
 const jsonFiles = {
   queries: "database/config/queries.json",
   sessions: "database/config/sessions.json"
 };
+
 
 // Connect to DB and start server
 (async () => {
@@ -41,10 +43,10 @@ const jsonFiles = {
 })();
 
 //////////////////////////////////////////////// Routing ////////////////////////////////////////////////
-
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
+
 
 app.get('/event', async (req, res) => {
   try {
@@ -55,6 +57,27 @@ app.get('/event', async (req, res) => {
   }
 });
 
+
+app.get('/eventQueries', async (req, res) => {
+  try {
+    const data = await getEventQueries();
+    res.json(data);
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+
+app.get('/sessionTypes', async (req, res) => {
+  try {
+    const data = await getSessionType();
+    res.json(data);
+  } catch {
+    res.status(500).send('Error fetching data');
+  }
+});
+
+
 app.get('/users', async (req, res) => {
   try {
     const data = await getUsers();
@@ -63,6 +86,7 @@ app.get('/users', async (req, res) => {
     res.status(500).send('Error fetching data');
   }
 });
+
 
 app.get("/data", async (req, res) => {
   try {
@@ -75,10 +99,16 @@ app.get("/data", async (req, res) => {
   }
 });
 
+
 app.get("/session", async (req, res) => {
   try {
-    const { startTime, endTime, user_name } = req.query;
-    const data = await sessionFetchByQueries({ startTime, endTime, user_name });
+    const { startTime, endTime, user_name, eventType } = req.query;
+
+    if (!eventType) {
+      return res.status(400).json({ error: "eventType query parameter is required" });
+    }
+
+    const data = await sessionFetchByQueries({ eventType, startTime, endTime, user_name });
     res.json(data);
   } catch (err) {
     console.error(err);
@@ -86,9 +116,8 @@ app.get("/session", async (req, res) => {
   }
 });
 
+
 /////////////////////////////// Config Manager Endpoints ////////////////////////////////////
-
-
 app.get("/api/config-files", (req, res) => {
   res.json(Object.keys(jsonFiles));
 });
