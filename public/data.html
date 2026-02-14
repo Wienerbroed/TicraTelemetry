@@ -5,315 +5,204 @@
 <title>Event Pool Viewer</title>
 <link rel="stylesheet" href="styles/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
+<script type="module" src="scripts/utils.js"></script>
 </head>
-
 <body>
 
-  <header>
-        <div class="navbar">
-            <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
-            <a href="session.html">Sessions</a>
-        </div>
-  </header>
+<header>
+    <div class="navbar">
+        <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+        <a href="session.html">Sessions</a>
+    </div>
+</header>
 
 <h1>Event Pool Viewer</h1>
 
 <div id="filters">
-  <label>Event type:
-    <select id="eventType">
-      <option value="">Select event</option>
-    </select>
-  </label>
+    <label>Event type:
+        <select id="eventType"><option value="">Select event</option></select>
+    </label>
 
-  <label>Employee type:
-    <select id="employeeType">
-      <option value="">All</option>
-    </select>
-  </label>
+    <label>Employee type:
+        <select id="employeeType"><option value="">All</option></select>
+    </label>
 
-  <label>Start date:
-    <input type="date" id="startDate">
-  </label>
+    <label>Start date:
+        <input type="date" id="startDate">
+    </label>
 
-  <label>End date:
-    <input type="date" id="endDate">
-  </label>
+    <label>End date:
+        <input type="date" id="endDate">
+    </label>
 
-  <button id="applyButton">Apply</button>
+    <button id="applyButton">Apply</button>
 </div>
 
 <div id="tableContainer">
-  <table id="bigTable">
-    <thead></thead>
-    <tbody></tbody>
-  </table>
+    <table id="bigTable">
+        <thead></thead>
+        <tbody></tbody>
+    </table>
 </div>
 
 <div id="totalChartContainer">
-  <canvas id="totalChart"></canvas>
+    <canvas id="totalChart"></canvas>
 </div>
 
-<script>
-let FULL_EVENTS = [];
-let FILTERED_EVENTS = [];
-let USER_ORDER = [];
-let ACTIVE_USERS = [];
-let ROW_SORT_STATES = {};
-const COLORS = ['#4caf50','#2196f3','#ff9800','#f44336','#9c27b0','#00bcd4','#ffeb3b','#795548'];
+<script type="module">
+import { COLORS, setDefaultDateRange, fetchJson, populateDropdown, createHeader, createCell, applyHeatmap, sortTableByRow, renderBarChart } from './scripts/utils.js';
+
+const STATE = {
+    fullEvents: [],
+    filteredEvents: [],
+    activeUsers: [],
+    userOrder: [],
+    rowSortStates: {}
+};
 
 
-function setDefaultDates() {
-  const today = new Date();
-  const tenDaysAgo = new Date();
-  tenDaysAgo.setDate(today.getDate() - 10);
-
-  document.getElementById('startDate').value = tenDaysAgo.toISOString().split('T')[0];
-  document.getElementById('endDate').value = today.toISOString().split('T')[0];
-}
+setDefaultDateRange('startDate','endDate',10);
 
 
-async function loadEventTypes() {
-  //fetches event type from /event endpoint
-  const res = await fetch('/event');
-  const events = await res.json();
-
-  //Sets value for menu
-  const sel = document.getElementById('eventType');
-  sel.innerHTML = '<option value="">Select event</option>';
-
-  events.forEach(e => sel.appendChild(new Option(e, e)));
-}
-
-
-function populateEmployeeTypesFromData(events) {
-  //Fetches employee types
-  const sel = document.getElementById('employeeType');
-  const current = sel.value;
-
-  // Stets value for menu
-  const types = [...new Set(events.map(e => e.employee_type).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">All</option>';
-  types.forEach(t => sel.appendChild(new Option(t, t)));
-
-  if (types.includes(current)) sel.value = current;
-}
-
-
-async function loadData() {
-  const eventType = document.getElementById('eventType').value;
-  if (!eventType) return;
-
-  const startDate = document.getElementById('startDate').value;
-  const endDate = document.getElementById('endDate').value;
-
-  //Converts input data to query specific data
-  let url = `/data?inputEventType=${encodeURIComponent(eventType)}`;
-  if (startDate) url += `&startTime=${encodeURIComponent(startDate + 'T00:00:00')}`;
-  if (endDate) url += `&endTime=${encodeURIComponent(endDate + 'T23:59:59')}`;
-
-  const res = await fetch(url);
-  const data = await res.json();
-
-  // data handle
-  FULL_EVENTS = data.events.map(ev => ({
-    user: ev.user_name ?? "unknown",
-    selection: String(Object.values(ev.payload)[0] ?? "unknown"),  // <-- force string
-    employee_type: ev.employee_type ?? "unknown",
-    count: ev.count ?? 0
-  }));
-
-  populateEmployeeTypesFromData(FULL_EVENTS);
-  applyFilters();
-}
-
-
-function applyFilters() {
-  const emp = document.getElementById('employeeType').value;
-
-  FILTERED_EVENTS = FULL_EVENTS.filter(ev => {
-    if (emp && ev.employee_type !== emp) return false;
-    return true;
-  });
-
-  renderTable(FILTERED_EVENTS);
-}
-
-
-function renderTable(events) {
-  //User Data
-  const perUser = {};
-  const selections = [...new Set(events.map(e => e.selection))].sort();
-
-  //total data
-  const totals = {};
-  events.forEach(e => {
-    totals[e.user] = (totals[e.user] ?? 0) + e.count;
-  });
-
-  // removes users with 0
-  ACTIVE_USERS = Object.keys(totals).filter(u => totals[u] > 0).sort();
-  USER_ORDER = [...ACTIVE_USERS];
-
-  ACTIVE_USERS.forEach(u => perUser[u] = {});
-
-  events.forEach(e => {
-    if (totals[e.user] > 0) {
-      perUser[e.user][e.selection] = (perUser[e.user][e.selection] ?? 0) + e.count;
-    }
-  });
-
-  drawTable(perUser, selections);
-  drawTotalChart(perUser, selections);
-}
-
-
-function drawTable(perUser, selections) {
-  const thead = document.querySelector('#bigTable thead');
-  const tbody = document.querySelector('#bigTable tbody');
-  thead.innerHTML = '';
-  tbody.innerHTML = '';
-
-  const headerRow = document.createElement('tr');
-  
-  // Operation column
-  const opTh = createHeader('Operation');
-  opTh.classList.add('operation-cell');
-  headerRow.appendChild(opTh);
-
-  // User columns
-  USER_ORDER.forEach(u => {
-    const th = createHeader(u);
-    th.classList.add('user-header');
-    headerRow.appendChild(th);
-  });
-
-  // pins MOSt USED, AVERAGE, TOTAL
-  ['MOST USED','AVERAGE','TOTAL'].forEach(l => {
-    const th = createHeader(l);
-    th.classList.add('total-header');
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-
-  const columnMax = {};
-  USER_ORDER.forEach(u => {
-    columnMax[u] = Math.max(...selections.map(s => perUser[u]?.[s] ?? 0), 0);
-  });
-
-  selections.forEach(sel => {
-    const tr = document.createElement('tr');
-    tr.classList.add('sortable');
-    tr.dataset.operation = sel;
-
-    // Operation cell (truncate + tooltip)
-    const opTd = document.createElement('td');
-    opTd.textContent = sel;
-    opTd.title = sel; // full text on hover
-    opTd.classList.add('operation-cell');
-    tr.appendChild(opTd);
-
-
-    let total = 0;
-    USER_ORDER.forEach(u => {
-      const val = perUser[u]?.[sel] ?? 0;
-      total += val;
-      const g = columnMax[u] > 0 ? Math.round(255 - (val / columnMax[u]) * 100) : 255;
-      tr.appendChild(createCell(val, false, `rgb(${g},255,${g})`));
-    });
-
-    const avg = USER_ORDER.length ? (total / USER_ORDER.length).toFixed(2) : 0;
-
-    // Most used logic
-    let mostUsed = 0;
-    USER_ORDER.forEach(u => {
-      const userMax = Math.max(...selections.map(s => perUser[u]?.[s] ?? 0));
-      if ((perUser[u]?.[sel] ?? 0) === userMax && userMax > 0) mostUsed++;
-    });
-
-    tr.appendChild(createCell(mostUsed, true));
-    tr.appendChild(createCell(avg, true));
-    tr.appendChild(createCell(total, true));
-
-    tr.addEventListener('click', () => sortByRow(sel, perUser));
-
-    tbody.appendChild(tr);
-  });
-}
-
-
-function sortByRow(rowName, perUser) {
-  if (!(rowName in ROW_SORT_STATES)) ROW_SORT_STATES[rowName] = 0;
-  ROW_SORT_STATES[rowName] = (ROW_SORT_STATES[rowName] + 1) % 3;
-  const state = ROW_SORT_STATES[rowName];
-
-  if (state === 0) {
-    USER_ORDER = [...ACTIVE_USERS];
-  } else if (state === 1) {
-    // descending
-    USER_ORDER = [...ACTIVE_USERS].sort((a,b) => (perUser[b][rowName] ?? 0) - (perUser[a][rowName] ?? 0));
-  } else if (state === 2) {
-    // ascending
-    USER_ORDER = [...ACTIVE_USERS].sort((a,b) => (perUser[a][rowName] ?? 0) - (perUser[b][rowName] ?? 0));
-  }
-
-  drawTable(perUser, [...new Set(Object.keys(perUser).flatMap(u => Object.keys(perUser[u])))]);
-}
-
-
-function drawTotalChart(perUser, selections) {
-  const totals = selections.map(sel =>
-    USER_ORDER.reduce((sum, u) => sum + (perUser[u]?.[sel] ?? 0), 0)
-  );
-
-  const ctx = document.getElementById('totalChart');
-  if (window.totalChartInstance) window.totalChartInstance.destroy();
-
-  window.totalChartInstance = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: selections,
-      datasets: [{ data: totals, backgroundColor: COLORS }]
-    },
-    options: {
-      plugins: { legend: { position: 'bottom' } },
-      responsive: false,
-      animation: false
-    }
-  });
-}
-
-// Helpers
-function createHeader(text) {
-  const th = document.createElement('th');
-  th.textContent = text;
-  return th;
-}
-
-function createCell(v, bold = false, bg = null) {
-  const td = document.createElement('td');
-  td.textContent = v;
-  if (bold) td.style.fontWeight = 'bold';
-  if (bg) td.style.background = bg;
-  return td;
-}
-
+populateDropdown('eventType','/eventQueries','Select event');
 
 document.getElementById('applyButton').addEventListener('click', loadData);
-
+document.getElementById('employeeType').addEventListener('change', applyFilters);
 document.getElementById('eventType').addEventListener('change', () => {
-  document.getElementById('employeeType').value = '';
+    document.getElementById('employeeType').value = '';
 });
 
-document.getElementById('employeeType').addEventListener('change', applyFilters);
+// ----------------- DATA -----------------
+async function loadData(){
+    const eventType = document.getElementById('eventType').value;
+    if(!eventType) return;
+
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+
+    let url = `/data?inputEventType=${encodeURIComponent(eventType)}`;
+    if(startDate) url += `&startTime=${encodeURIComponent(startDate+'T00:00:00')}`;
+    if(endDate) url += `&endTime=${encodeURIComponent(endDate+'T23:59:59')}`;
+
+    const data = await fetchJson(url);
+
+    STATE.fullEvents = data.events.map(ev => ({
+        user: ev.user_name ?? "unknown",
+        selection: String(Object.values(ev.payload)[0] ?? "unknown"),
+        employee_type: ev.employee_type ?? "unknown",
+        count: ev.count ?? 0
+    }));
+
+    populateEmployeeTypes();
+    applyFilters();
+}
+
+function populateEmployeeTypes() {
+    const sel = document.getElementById('employeeType');
+    const current = sel.value;
+    const types = [...new Set(STATE.fullEvents.map(e=>e.employee_type).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">All</option>';
+    types.forEach(t => sel.appendChild(new Option(t,t)));
+    if(types.includes(current)) sel.value = current;
+}
+
+function applyFilters() {
+    const emp = document.getElementById('employeeType').value;
+    STATE.filteredEvents = STATE.fullEvents.filter(ev => !emp || ev.employee_type === emp);
+    renderTableAndChart();
+}
+
+// ----------------- TABLE -----------------
+function buildPerUser(events){
+    const perUser = {};
+    const totals = {};
+    events.forEach(e => totals[e.user] = (totals[e.user]??0)+e.count);
+    STATE.activeUsers = Object.keys(totals).filter(u=>totals[u]>0).sort();
+    STATE.userOrder = [...STATE.activeUsers];
+
+    STATE.activeUsers.forEach(u => perUser[u] = {});
+    events.forEach(e => {
+        if(totals[e.user]>0) perUser[e.user][e.selection] = (perUser[e.user][e.selection]??0)+e.count;
+    });
+    return perUser;
+}
+
+function getSelections(perUser) {
+    return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort();
+}
+
+function calculateColumnMax(perUser, selections) {
+    const maxValues = {};
+    STATE.userOrder.forEach(u => maxValues[u] = Math.max(...selections.map(s => perUser[u]?.[s]??0),0));
+    return maxValues;
+}
+
+function renderTableAndChart(){
+    const perUser = buildPerUser(STATE.filteredEvents);
+    const selections = getSelections(perUser);
+    drawTable(perUser,selections);
+    drawChart(perUser,selections);
+}
+
+function drawTable(perUser,selections){
+    const thead = document.querySelector('#bigTable thead');
+    const tbody = document.querySelector('#bigTable tbody');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    const headerRow = document.createElement('tr');
+    headerRow.appendChild(createHeader('Operation'));
+    STATE.userOrder.forEach(u => headerRow.appendChild(createHeader(u,'user-header')));
+    ['MOST USED','AVERAGE','TOTAL'].forEach(l=>headerRow.appendChild(createHeader(l,'total-header')));
+    thead.appendChild(headerRow);
+
+    const columnMax = calculateColumnMax(perUser,selections);
+
+    selections.forEach(sel=>{
+        const tr = document.createElement('tr');
+        tr.classList.add('sortable');
+        tr.dataset.operation = sel;
+
+        tr.appendChild(createCell(sel,false,'', 'operation-cell'));
+
+        let total=0;
+        STATE.userOrder.forEach(u=>{
+            const val = perUser[u]?.[sel]??0;
+            total+=val;
+            tr.appendChild(createCell(val,false,cellColor(val,columnMax[u])));
+        });
+
+        const avg = STATE.userOrder.length ? (total/STATE.userOrder.length).toFixed(2) : 0;
+
+        let mostUsed=0;
+        STATE.userOrder.forEach(u=>{
+            const userMax = Math.max(...selections.map(s=>perUser[u]?.[s]??0));
+            if((perUser[u]?.[sel]??0)===userMax && userMax>0) mostUsed++;
+        });
+
+        tr.appendChild(createCell(mostUsed,true));
+        tr.appendChild(createCell(avg,true));
+        tr.appendChild(createCell(total,true));
+
+        tr.addEventListener('click',()=>sortTableByRow(document.querySelector('#bigTable'),tr,STATE.rowSortStates));
+        tbody.appendChild(tr);
+    });
+}
+
+function cellColor(value,max){ 
+    const g = max>0?Math.round(255-(value/max)*100):255;
+    return `rgb(${g},255,${g})`;
+}
 
 
-setDefaultDates();
-loadEventTypes();
+function drawChart(perUser,selections){
+    const totals = selections.map(sel=>STATE.userOrder.reduce((sum,u)=>sum+(perUser[u]?.[sel]??0),0));
+    renderBarChart(document.getElementById('totalChart'), selections, totals, COLORS, {plugins:{legend:{position:'bottom'}}, responsive:false, animation:false});
+}
 </script>
-    <footer>
-        © TICRA foundation
-    </footer>
+
+<footer>
+    © TICRA foundation
+</footer>
 </body>
 </html>
-

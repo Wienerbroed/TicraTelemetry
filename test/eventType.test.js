@@ -16,7 +16,20 @@ vi.mock("fs/promises", () => ({
 
 vi.mock("../database/db.js", () => ({
   connectDB: vi.fn(async () => ({
-    collection: vi.fn()
+    collection: vi.fn(() => ({
+      distinct: vi.fn(async () => [
+        "3D View",
+        "Create",
+        "Explorer",
+        "GraspGUI End",
+        "GraspGUI Start",
+        "Object Tree",
+        "Results",
+        "SplashScreenWizard",
+        "Tabpage",
+        "Toggle Editor"
+      ])
+    }))
   }))
 }));
 
@@ -30,11 +43,16 @@ describe("getEventType", () => {
     const result = await getEventType();
 
     expect(result).toEqual([
-      "GraspGuiStartExplorerSelection",
-      "CreateEvents",
-      "ToggleEditorEvents",
-      "ExplorerEvents",
-      "GraspGuiStartAppTitle"
+      "3D View",
+      "Create",
+      "Explorer",
+      "GraspGUI End",
+      "GraspGUI Start",
+      "Object Tree",
+      "Results",
+      "SplashScreenWizard",
+      "Tabpage",
+      "Toggle Editor"
     ]);
   });
 });

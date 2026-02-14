@@ -7,12 +7,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 
+// Hardcoded Query files
 const jsonFiles = {
     queries: "queries.json",
     sessions: "sessions.json"
 };
 
 
+// Hardcoded schemas for query files
 const jsonSchemas = {
     queries: (title, eventType, payloadPath) => ({
         [title]: {
@@ -41,15 +43,17 @@ const jsonSchemas = {
 };
 
 
+// Makes sure payload is stored as payload.(input)
 function assignNested(obj, path, value, baseFields = {}) {
   if (!path) return { ...baseFields, ...obj };
 
-  // Store the path as a flat key (dot notation preserved)
+  // Store the path as a flat key
   obj[path] = value;
 
-  // Merge with base fields (_id, event_type, etc.)
+  // Merge with base fields
   return { ...baseFields, ...obj };
 }
+
 
 
 async function appendJson(fileKey, title, eventType, payloadPath) {
@@ -81,6 +85,7 @@ async function appendJson(fileKey, title, eventType, payloadPath) {
 }
 
 
+
 async function updateJson(fileKey, keyToUpdate, newTitle, newEventType, newPayloadPath) {
     try {
         if (!jsonFiles[fileKey]) throw new Error("Invalid file key");
@@ -109,6 +114,7 @@ async function updateJson(fileKey, keyToUpdate, newTitle, newEventType, newPaylo
         console.error("Error:", err.message);
     }
 }
+
 
 
 async function deleteJson(fileKey, keyToDelete) {
