@@ -4,7 +4,7 @@ import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
 import { getSessionType } from './database/session.js';
 import { getUsers } from './database/user.js';
-import { fetchDataPoolByQueries, sessionFetchByQueries } from './database/datapool.js';
+import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from './database/datapool.js';
 import { appendJson, deleteJson, updateJson } from './database/config/configManager.js';
 import { getEventQueries } from './database/eventQueries.js';
 import path from "path";
@@ -115,6 +115,25 @@ app.get("/session", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+app.get("/sessionTimeline", async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId query parameter is required" });
+    }
+
+    const data = await sessionTimeline({ sessionId });
+    res.json(data);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 
 /////////////////////////////// Config Manager Endpoints ////////////////////////////////////

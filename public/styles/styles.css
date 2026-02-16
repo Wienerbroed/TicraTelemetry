@@ -1,146 +1,213 @@
+/* =========================
+   BASE PAGE LAYOUT
+========================= */
+
 body {
-  font-family: Arial;
+  font-family: Arial, sans-serif;
   margin: 0;
-  overflow-x: auto;
+  padding-top: 65px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 65px;
+  overflow-x: hidden;
+  background: #ffffff;
 }
+
 header {
-    width: 100vw;
-    height: 65px;
-    background-color: rgb(201, 197, 188);
-    color: black;
-    top: 0%;
-    position: fixed;
+  width: 100vw;
+  height: 65px;
+  background-color: rgb(201, 197, 188);
+  position: fixed;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
 }
+
 footer {
-    width: 100vw;
-    height: 25px;
-    background-color: rgb(201, 197, 188);
-    padding-left: 30px;
-    bottom: 0%;
-    position: fixed;
+  width: 100vw;
+  height: 25px;
+  background-color: rgb(201, 197, 188);
+  position: fixed;
+  bottom: 0;
+  padding-left: 30px;
+  line-height: 25px;
 }
-table {
-  border-collapse: collapse;
-  width: auto;
-  max-width: 95%;
-  text-align: center;
-  margin-bottom: 18px;
-}
-th, td {
-  border: 2px solid #555;
-  padding: 1px 1px;
-  font-size: 12px;
-  text-align: center;
-  white-space: nowrap;
-}
-th {
-  background-color: #eee;
-  cursor: pointer;
-}
+
+/* =========================
+   NAVBAR
+========================= */
+
 .navbar {
-    display: flex;
-    justify-content: left;
-    align-items: center;
-    height: 100%;
-    gap: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
-.navbar a{
-    color: rgb(0, 0, 0);
-    padding: 15px 20px;
+
+.navbar a {
+  color: black;
+  padding: 15px 20px;
+  text-decoration: none;
 }
-.navbar img.nav-icon{
-    max-width: 80px;
-    max-height: 28px;
+
+.navbar a:hover {
+  background-color: blue;
+  color: white;
 }
-.navbar a:hover{
-    background-color: blue;
+
+.navbar img.nav-icon {
+  max-width: 80px;
+  max-height: 28px;
 }
-.legend {
-  margin: 20px 0;
-  text-align: center;
-}
-.legend-item {
-  display: inline-block;
-  margin-right: 15px;
-}
-.legend-color {
-  width: 15px;
-  height: 15px;
-  display: inline-block;
-  margin-right: 5px;
-}
-table canvas {
-  width: 60px;
-  height: 60px;
-}
-#filters {
+
+/* =========================
+   FORM
+========================= */
+
+form#sessionForm {
   margin-bottom: 15px;
   display: flex;
   gap: 15px;
   flex-wrap: wrap;
   align-items: center;
 }
-#tableContainer {
-  width: 100%;  
-  overflow-x: auto;  
+
+form#sessionForm input,
+form#sessionForm select {
+  padding: 4px 6px;
 }
+
+/* =========================
+   TABLE WRAPPER
+========================= */
+
+#tableContainerWrapper {
+  width: 100%;
+  overflow-x: auto;
+  position: relative;
+  padding: 0 0px;
+  box-sizing: border-box;
+}
+
+#tableContainer {
+  width: fit-content;
+  margin: 0 auto;
+  border-left: 3px solid #444;
+}
+
+/* =========================
+   TABLE STRUCTURE
+========================= */
 
 #tableContainer table {
-  margin: 0 auto;    
-  min-width: 30px;   
-  table-layout: fixed; 
-}
-
-table#bigTable {
-  border-collapse: collapse;
-  min-width: 30px;
-  max-width: 90vw;
+  border-collapse: separate; /* required for sticky borders */
+  border-spacing: 0;
   table-layout: fixed;
+  background: #ffffff;
 }
 
-th.user-header, th.total-header {
+/* =========================
+   CELL BASE STYLING
+========================= */
+
+th,
+td {
+  padding: 2px 2px;
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: center;
+  background-color: #ffffff;
+  border-right: 2px solid #555;
+  border-bottom: 2px solid #555;
+}
+
+/* Top border */
+thead th {
+  border-top: 2px solid #555;
+}
+
+/* Left border */
+th:first-child,
+td:first-child {
+  border-left: 2px solid #555;
+}
+
+/* =========================
+   HEADER ROW (Sticky Top)
+========================= */
+
+thead th {
+  position: sticky;
+  top: 0;
+  background-color: #eeeeee;
+  z-index: 200; /* base header layer */
+  cursor: pointer;
+}
+
+/* =========================
+   STICKY COLUMNS (1–3)
+========================= */
+
+/* Sticky body cells */
+tbody td.sticky {
+  position: sticky;
+  background-color: #f8f8f8 !important;
+  background-clip: padding-box;
+  z-index: 150; /* above normal cells */
+}
+
+/* Sticky header cells (FIRST 3 COLUMNS TOP CELLS) */
+thead th.sticky {
+  position: sticky;
+  background-color: #e6e6e6 !important;
+  z-index: 300; /* highest layer */
+}
+
+/* Visual separator shadow */
+td.sticky,
+th.sticky {
+  box-shadow: 4px 0 4px -2px rgba(0, 0, 0, 0.25);
+}
+
+/* Normal body cells lower */
+tbody td {
+  position: relative;
+  z-index: 1;
+}
+
+/* =========================
+   ROTATED TOP HEADERS
+========================= */
+
+th.rotate > div {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  white-space: nowrap;
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  min-height: 60px;
+  box-sizing: border-box;
 }
+
+/* =========================
+   HOVER (exclude sticky)
+========================= */
+
+tr.sortable:hover td:not(.sticky) {
+  background-color: #f0f0f0;
+  cursor: pointer;
+}
+
+/* =========================
+   CHART CONTAINER
+========================= */
 
 #totalChartContainer {
   margin-top: 20px;
   display: flex;
   justify-content: center;
-}
-.chart-container {
   width: 80%;
   max-width: 800px;
   height: 300px;
-}
-
-tr.sortable:hover {
-  cursor: pointer;
-  background-color: #f0f0f0;
-}
-th.rotate {
-  padding: 0;
-  vertical-align: bottom; /* Align content to bottom of cell */
-}
-
-th.rotate > div {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  white-space: nowrap;
-
-  display: inline-flex; /* inline-flex allows sizing based on content */
-  align-items: center;
-  justify-content: center;
-
-  padding: 8px 4px; /* adjust spacing */
-  box-sizing: border-box;
-
-  height: auto; /* allow height to grow with content */
-  min-height: 50px; /* optional: prevent it from being too small */
 }

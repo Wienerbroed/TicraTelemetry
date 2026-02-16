@@ -38,19 +38,25 @@
     <button id="applyButton">Apply</button>
 </div>
 
-<div id="tableContainer">
-    <table id="bigTable">
-        <thead></thead>
-        <tbody></tbody>
-    </table>
+<div id="tableContainerWrapper">
+    <div id="tableContainer">
+        <table id="bigTable">
+            <thead></thead>
+            <tbody></tbody>
+        </table>
+    </div>
 </div>
 
 <div id="totalChartContainer">
     <canvas id="totalChart"></canvas>
 </div>
 
+<footer>
+    © TICRA foundation
+</footer>
+
 <script type="module">
-import { COLORS, setDefaultDateRange, fetchJson, populateDropdown, createHeader, createCell, applyHeatmap, sortTableByRow, renderBarChart } from './scripts/utils.js';
+import { COLORS, setDefaultDateRange, fetchJson, populateDropdown, createHeader, createCell, applyHeatmap, sortTableByRow, renderBarChart, applyStickyColumns } from './scripts/utils.js';
 
 const STATE = {
     fullEvents: [],
@@ -60,10 +66,7 @@ const STATE = {
     rowSortStates: {}
 };
 
-
 setDefaultDateRange('startDate','endDate',10);
-
-
 populateDropdown('eventType','/eventQueries','Select event');
 
 document.getElementById('applyButton').addEventListener('click', loadData);
@@ -72,7 +75,16 @@ document.getElementById('eventType').addEventListener('change', () => {
     document.getElementById('employeeType').value = '';
 });
 
-// ----------------- DATA -----------------
+// Create rotated header
+function createRotatedHeader(text){
+    const th = document.createElement('th');
+    th.classList.add('rotate', 'sticky'); // sticky will be applied later
+    const div = document.createElement('div');
+    div.textContent = text;
+    th.appendChild(div);
+    return th;
+}
+
 async function loadData(){
     const eventType = document.getElementById('eventType').value;
     if(!eventType) return;
@@ -112,7 +124,6 @@ function applyFilters() {
     renderTableAndChart();
 }
 
-// ----------------- TABLE -----------------
 function buildPerUser(events){
     const perUser = {};
     const totals = {};
@@ -137,13 +148,6 @@ function calculateColumnMax(perUser, selections) {
     return maxValues;
 }
 
-function renderTableAndChart(){
-    const perUser = buildPerUser(STATE.filteredEvents);
-    const selections = getSelections(perUser);
-    drawTable(perUser,selections);
-    drawChart(perUser,selections);
-}
-
 function drawTable(perUser,selections){
     const thead = document.querySelector('#bigTable thead');
     const tbody = document.querySelector('#bigTable tbody');
@@ -151,9 +155,14 @@ function drawTable(perUser,selections){
     tbody.innerHTML = '';
 
     const headerRow = document.createElement('tr');
-    headerRow.appendChild(createHeader('Operation'));
-    STATE.userOrder.forEach(u => headerRow.appendChild(createHeader(u,'user-header')));
-    ['MOST USED','AVERAGE','TOTAL'].forEach(l=>headerRow.appendChild(createHeader(l,'total-header')));
+
+    // First 4 sticky columns: Operation, MOST USED, AVERAGE, TOTAL
+    headerRow.appendChild(createRotatedHeader('Operation'));
+    headerRow.appendChild(createRotatedHeader('MOST USED'));
+    headerRow.appendChild(createRotatedHeader('AVERAGE'));
+    headerRow.appendChild(createRotatedHeader('TOTAL'));
+
+    STATE.userOrder.forEach(u => headerRow.appendChild(createRotatedHeader(u)));
     thead.appendChild(headerRow);
 
     const columnMax = calculateColumnMax(perUser,selections);
@@ -163,14 +172,11 @@ function drawTable(perUser,selections){
         tr.classList.add('sortable');
         tr.dataset.operation = sel;
 
-        tr.appendChild(createCell(sel,false,'', 'operation-cell'));
+        tr.appendChild(createCell(sel,false,'','operation-cell'));
 
+        // MOST USED
         let total=0;
-        STATE.userOrder.forEach(u=>{
-            const val = perUser[u]?.[sel]??0;
-            total+=val;
-            tr.appendChild(createCell(val,false,cellColor(val,columnMax[u])));
-        });
+        STATE.userOrder.forEach(u=>total += perUser[u]?.[sel]??0);
 
         const avg = STATE.userOrder.length ? (total/STATE.userOrder.length).toFixed(2) : 0;
 
@@ -184,9 +190,20 @@ function drawTable(perUser,selections){
         tr.appendChild(createCell(avg,true));
         tr.appendChild(createCell(total,true));
 
+        // User columns
+        STATE.userOrder.forEach(u=>{
+            const val = perUser[u]?.[sel]??0;
+            tr.appendChild(createCell(val,false,cellColor(val,columnMax[u])));
+        });
+
         tr.addEventListener('click',()=>sortTableByRow(document.querySelector('#bigTable'),tr,STATE.rowSortStates));
         tbody.appendChild(tr);
     });
+
+    applyHeatmap('#bigTable');
+
+    // Make first 4 columns sticky
+    applyStickyColumns(document.querySelector('#bigTable'), 4);
 }
 
 function cellColor(value,max){ 
@@ -194,15 +211,15 @@ function cellColor(value,max){
     return `rgb(${g},255,${g})`;
 }
 
+function renderTableAndChart(){
+    const perUser = buildPerUser(STATE.filteredEvents);
+    const selections = getSelections(perUser);
+    drawTable(perUser,selections);
 
-function drawChart(perUser,selections){
     const totals = selections.map(sel=>STATE.userOrder.reduce((sum,u)=>sum+(perUser[u]?.[sel]??0),0));
     renderBarChart(document.getElementById('totalChart'), selections, totals, COLORS, {plugins:{legend:{position:'bottom'}}, responsive:false, animation:false});
 }
 </script>
 
-<footer>
-    © TICRA foundation
-</footer>
 </body>
 </html>

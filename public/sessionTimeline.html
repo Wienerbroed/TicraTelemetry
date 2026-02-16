@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Session Timeline</title>
+<style>
+body { font-family: Arial, sans-serif; margin:40px; background:#f4f6f9; }
+h2 { margin-bottom:20px; }
+input { padding:8px; width:400px; }
+button { padding:8px 14px; cursor:pointer; background:#2f80ed; color:white; border:none; border-radius:4px; }
+.summary { margin-top:20px; padding:15px; background:white; border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+.timeline-wrapper { margin-top:40px; width:100%; overflow-x:auto; border-top:3px solid #ccc; padding-top:20px; }
+.timeline { display:flex; align-items:flex-start; height:80px; min-width:1200px; }
+.event-box { display:flex; align-items:center; justify-content:center; height:60px; color:white; font-size:12px; border-radius:6px; margin-right:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.2s;}
+.event-box:hover { opacity:0.85; }
+.legend { margin-top:25px; display:flex; gap:40px; }
+.legend-column { display:flex; flex-direction:column; gap:8px; }
+.legend-title { font-weight:bold; margin-bottom:6px; }
+.legend-item { display:flex; align-items:center; font-size:13px; }
+.legend-color { width:15px; height:15px; margin-right:6px; border-radius:3px; }
+</style>
+</head>
+<body>
+
+<h2>Session Timeline</h2>
+<input id="sessionInput" placeholder="Enter session ID">
+<button onclick="loadSession()">Load</button>
+
+<div id="summary"></div>
+<div class="timeline-wrapper"><div id="timeline" class="timeline"></div></div>
+<div id="legend" class="legend"></div>
+
+<script>
+const colorMap = {};
+
+// Generate color for event_type + last payload
+function getColor(eventType, payload) {
+  const key = payload ? `${eventType}-${JSON.stringify(payload)}` : `${eventType}-null`;
+  if (!colorMap[key]) {
+    const hue = (Object.keys(colorMap).length * 100) % 360;
+    colorMap[key] = payload ? `hsl(${hue},50%,40%)` : "#888";
+  }
+  return colorMap[key];
+}
+
+async function loadSession() {
+  const sessionId = document.getElementById("sessionInput").value.trim();
+  if (!sessionId) { alert("Enter session ID"); return; }
+
+  const response = await fetch(`/sessionTimeline?sessionId=${sessionId}`);
+  const data = await response.json();
+
+  const summaryDiv = document.getElementById("summary");
+  const timelineDiv = document.getElementById("timeline");
+  const legendDiv = document.getElementById("legend");
+
+  summaryDiv.innerHTML = "";
+  timelineDiv.innerHTML = "";
+  legendDiv.innerHTML = "";
+  Object.keys(colorMap).forEach(k => delete colorMap[k]);
+
+  if (!data.timeline || !data.timeline.length) {
+    summaryDiv.innerHTML = "<p>No events found.</p>";
+    return;
+  }
+
+  const totalDuration = data.totalDurationSeconds || 1;
+
+  // Summary
+  summaryDiv.innerHTML = `<div class="summary">
+    <strong>User:</strong> ${data.user_name}<br/>
+    <strong>Employee Type:</strong> ${data.employee_type}<br/>
+    <strong>Total Events:</strong> ${data.totalEvents}<br/>
+    <strong>Total Duration:</strong> ${Math.round(totalDuration)} seconds
+  </div>`;
+
+  const MIN_TOTAL_WIDTH = 1200;
+  const timelineTotalWidth = Math.max(data.timeline.length * 50, MIN_TOTAL_WIDTH);
+
+  // Timeline boxes
+  data.timeline.forEach(event => {
+    const box = document.createElement("div");
+    box.className = "event-box";
+
+    const boxWidth = (event.durationSeconds / totalDuration) * timelineTotalWidth;
+    box.style.width = boxWidth + "px";
+
+    box.style.background = getColor(event.event_type, event.payload);
+
+    const payloadText = event.payload ? JSON.stringify(event.payload) : "No payload";
+    box.title = `Event: ${event.event_type}\nDuration: ${Math.round(event.durationSeconds)} sec\nTime: ${new Date(event.time_stamp).toLocaleTimeString()}\nPayload: ${payloadText}`;
+    box.innerText = event.event_type;
+
+    timelineDiv.appendChild(box);
+  });
+
+  // Columnar legend
+  const grouped = {};
+  Object.keys(colorMap).forEach(key => {
+    const [type, payloadStr] = key.split(/-(.+)/);
+    if (!grouped[type]) grouped[type] = [];
+    grouped[type].push({ key, payloadStr, color: colorMap[key] });
+  });
+
+  Object.keys(grouped).forEach(type => {
+    const column = document.createElement("div");
+    column.className = "legend-column";
+
+    const title = document.createElement("div");
+    title.className = "legend-title";
+    title.innerText = type;
+    column.appendChild(title);
+
+    grouped[type].forEach(item => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "legend-item";
+
+      const colorBox = document.createElement("div");
+      colorBox.className = "legend-color";
+      colorBox.style.background = item.color;
+
+      const label = document.createElement("span");
+      label.innerText = item.payloadStr === "null" ? "No payload" : item.payloadStr;
+
+      itemDiv.appendChild(colorBox);
+      itemDiv.appendChild(label);
+      column.appendChild(itemDiv);
+    });
+
+    legendDiv.appendChild(column);
+  });
+}
+</script>
+
+</body>
+</html>

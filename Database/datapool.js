@@ -318,5 +318,65 @@ const sessionFetchByQueries = async ({ eventType, startTime, endTime, user_name 
 };
 
 
+const sessionTimeline = async ({ sessionId }) => {
+  if (!sessionId) throw new Error("Session id required");
 
-export { fetchDataPoolByQueries, sessionFetchByQueries };
+  const events = await dbCollection
+    .find({ session_id: sessionId })
+    .sort({ event_number: 1 })
+    .toArray();
+
+  if (!events.length) return { sessionId, totalEvents: 0, timeline: [] };
+
+  let totalDurationSeconds = 0;
+
+  const timeline = events.map((current, i) => {
+    const next = events[i + 1];
+    let durationSeconds = 0;
+
+    if (next) {
+      const currentTime = new Date(current.time_stamp);
+      const nextTime = new Date(next.time_stamp);
+      durationSeconds = (nextTime - currentTime) / 1000;
+      totalDurationSeconds += durationSeconds;
+    }
+
+    // Extract only the "last" key from the payload
+    let lastPayload = null;
+    if (current.payload && typeof current.payload === "object") {
+      const keys = Object.keys(current.payload);
+      if (keys.length) {
+        const lastKey = keys[keys.length - 1]; // last key in object
+        lastPayload = { [lastKey]: current.payload[lastKey] };
+      }
+    }
+
+    return {
+      event_number: current.event_number,
+      event_type: current.event_type,
+      payload: lastPayload, // only last field
+      time_stamp: current.time_stamp,
+      durationSeconds,
+      isLastEvent: !next
+    };
+  });
+
+  return {
+    sessionId,
+    user_name: events[0].user_name,
+    employee_type: events[0].employee_type,
+    totalEvents: events.length,
+    totalDurationSeconds,
+    timeline
+  };
+};
+
+
+
+
+
+
+
+
+
+export { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline };

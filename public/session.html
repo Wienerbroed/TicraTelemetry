@@ -10,10 +10,10 @@
 <body>
 
 <header>
-    <div class="navbar">
-        <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
-        <a href="data.html">Datapool</a>
-    </div>
+  <div class="navbar">
+    <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+    <a href="data.html">Datapool</a>
+  </div>
 </header>
 
 <h1>Session Viewer</h1>
@@ -38,7 +38,9 @@
   <button type="submit">Apply</button>
 </form>
 
-<div id="tableContainer"></div>
+<div id="tableContainerWrapper">
+  <div id="tableContainer"></div>
+</div>
 
 <div id="totalChartContainer" class="chart-container">
   <canvas id="totalChart"></canvas>
@@ -46,8 +48,8 @@
 
 <script type="module">
 import { 
-    setDefaultDateRange, fetchJson, createHeader, createCell, applyHeatmap, 
-    sortTableByRow, renderBarChart, populateDropdown 
+    setDefaultDateRange, fetchJson, createCell, applyHeatmap, 
+    sortTableByRow, renderBarChart, populateDropdown, applyStickyColumns 
 } from './scripts/utils.js';
 
 const eventTypeSelect = document.getElementById("eventTypeSelect");
@@ -59,23 +61,20 @@ const tableContainer = document.getElementById("tableContainer");
 const totalChartCanvas = document.getElementById("totalChart");
 let sortState = {};
 
-
 setDefaultDateRange('startTime','endTime',10);
 
-async function initDropdownsAndLoad() {
+// Initialize dropdowns and load data
+async function init() {
     await populateDropdown('eventTypeSelect','/sessionTypes','Select Event Type');
     await populateDropdown('employeeSelect','/users','All');
     fetchSessions();
 }
-
-initDropdownsAndLoad();
-
+init();
 
 form.addEventListener('submit', e=>{
     e.preventDefault();
     fetchSessions();
 });
-
 
 async function fetchSessions(){
     const selectedEvent = eventTypeSelect.value;
@@ -103,7 +102,17 @@ async function fetchSessions(){
     renderChart(perEmployee);
 }
 
-// ----------------- TABLE -----------------
+// Rotated header helper
+function createRotatedHeader(text, sticky=false){
+    const th = document.createElement("th");
+    th.classList.add("rotate");
+    if(sticky) th.classList.add("sticky");
+    const div = document.createElement("div");
+    div.textContent = text;
+    th.appendChild(div);
+    return th;
+}
+
 function renderTable(perEmployee){
     tableContainer.innerHTML = "";
     const selectedUser = employeeSelect.value || null;
@@ -112,15 +121,6 @@ function renderTable(perEmployee){
     else renderSingleUserTable(perEmployee[selectedUser]);
 
     applyHeatmap("#tableContainer table");
-}
-
-function createRotatedHeader(text){
-    const th = document.createElement("th");
-    th.classList.add("rotate");
-    const div = document.createElement("div");
-    div.textContent = text;
-    th.appendChild(div);
-    return th;
 }
 
 function renderMultiUserTable(perEmployee){
@@ -135,28 +135,36 @@ function renderMultiUserTable(perEmployee){
     const thead = document.createElement("thead");
     const tbody = document.createElement("tbody");
 
-    // Header
     const headerRow = document.createElement("tr");
-    headerRow.appendChild(createHeader("Tab"));
+    // First 4 sticky columns: Tab, TOTAL, AVERAGE
+    headerRow.appendChild(createRotatedHeader("Tab", true));
+    headerRow.appendChild(createRotatedHeader("TOTAL", true));
+    headerRow.appendChild(createRotatedHeader("AVERAGE", true));
     employeeNames.forEach(u => headerRow.appendChild(createRotatedHeader(u)));
-    ["TOTAL","AVERAGE"].forEach(label => headerRow.appendChild(createRotatedHeader(label)));
     thead.appendChild(headerRow);
 
-    // Rows
     allTabs.forEach(tab=>{
         const tr = document.createElement("tr");
         tr.dataset.tab = tab;
         tr.classList.add('sortable');
-        tr.appendChild(createCell(tab));
 
+        // Tab column
+        tr.appendChild(createCell(tab, false, '', 'sticky'));
+
+        // TOTAL and AVERAGE
         let total=0;
         employeeNames.forEach(u=>{
             const val = perEmployee[u].find(s=>s.tab===tab)?.durationSeconds||0;
-            total+=val;
+            total += val;
+        });
+        tr.appendChild(createCell(Math.round(total), true, '', 'sticky'));
+        tr.appendChild(createCell((total/employeeNames.length).toFixed(2), true, '', 'sticky'));
+
+        // Employee columns
+        employeeNames.forEach(u=>{
+            const val = perEmployee[u].find(s=>s.tab===tab)?.durationSeconds||0;
             tr.appendChild(createCell(Math.round(val)));
         });
-        tr.appendChild(createCell(Math.round(total),true));
-        tr.appendChild(createCell((total/employeeNames.length).toFixed(2),true));
 
         tbody.appendChild(tr);
         tr.addEventListener('click', ()=>sortTableByRow(table,tr,sortState));
@@ -165,6 +173,9 @@ function renderMultiUserTable(perEmployee){
     table.appendChild(thead);
     table.appendChild(tbody);
     tableContainer.appendChild(table);
+
+    
+    applyStickyColumns(table, 3);
 }
 
 function renderSingleUserTable(sessions){
@@ -179,27 +190,32 @@ function renderSingleUserTable(sessions){
     const thead = document.createElement("thead");
     const tbody = document.createElement("tbody");
 
-    // Header
     const headerRow = document.createElement("tr");
-    headerRow.appendChild(createHeader("Tab"));
+    headerRow.appendChild(createRotatedHeader("Tab", true));
+    headerRow.appendChild(createRotatedHeader("TOTAL", true));
+    headerRow.appendChild(createRotatedHeader("AVERAGE", true));
     sessionIds.forEach(id => headerRow.appendChild(createRotatedHeader(id)));
-    ["TOTAL","AVERAGE"].forEach(label => headerRow.appendChild(createRotatedHeader(label)));
     thead.appendChild(headerRow);
 
-    // Rows
     tabs.forEach(tab=>{
         const tr = document.createElement("tr");
         tr.dataset.tab = tab;
-        tr.appendChild(createCell(tab));
+        tr.appendChild(createCell(tab,false,'sticky'));
 
+        // TOTAL and AVERAGE
         let total=0;
         sessionIds.forEach(id=>{
             const val = sessions.find(s=>s.tab===tab && s.session_id===id)?.durationSeconds||0;
-            total+=val;
+            total += val;
+        });
+        tr.appendChild(createCell(Math.round(total),true,'','sticky'));
+        tr.appendChild(createCell((total/sessionIds.length).toFixed(2),true,'','sticky'));
+
+        // Session columns
+        sessionIds.forEach(id=>{
+            const val = sessions.find(s=>s.tab===tab && s.session_id===id)?.durationSeconds||0;
             tr.appendChild(createCell(Math.round(val)));
         });
-        tr.appendChild(createCell(Math.round(total),true));
-        tr.appendChild(createCell((total/sessionIds.length).toFixed(2),true));
 
         tbody.appendChild(tr);
         tr.addEventListener('click', ()=>sortTableByRow(table,tr,sortState));
@@ -208,9 +224,10 @@ function renderSingleUserTable(sessions){
     table.appendChild(thead);
     table.appendChild(tbody);
     tableContainer.appendChild(table);
+
+    applyStickyColumns(table, 3);
 }
 
-// ----------------- CHART -----------------
 function renderChart(perEmployee){
     const selectedUser = employeeSelect.value || null;
     let labels=[], totals=[];
@@ -225,15 +242,10 @@ function renderChart(perEmployee){
         totals = tabs.map(tab=>sessions.filter(s=>s.tab===tab).reduce((sum,s)=>sum+s.durationSeconds,0));
     }
 
-    // Random colors per bar
     const colors = labels.map(_=>`rgb(${Math.random()*200},${Math.random()*200},${Math.random()*200})`);
-
     renderBarChart(totalChartCanvas, labels, totals, colors, {
         responsive:true,
-        plugins:{
-            legend:{display:false},
-            title:{display:true,text:'Total Duration per Tab'}
-        },
+        plugins:{legend:{display:false}, title:{display:true,text:'Total Duration per Tab'}},
         scales:{y:{beginAtZero:true}}
     });
 }

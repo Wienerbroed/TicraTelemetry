@@ -138,3 +138,69 @@ export function renderBarChart(canvas, labels, data, colors, options={}) {
         options
     });
 }
+
+export function applyStickyColumns(table, numColumns = 3) {
+    if (!table) return;
+
+    const wrapper = table.closest('#tableContainerWrapper');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+
+    if (!thead || !tbody) return;
+
+    const headers = [];
+    const cellsPerColumn = [];
+
+    // collect first X columns
+    for (let col = 0; col < numColumns; col++) {
+        const header = thead.querySelector(`th:nth-child(${col+1})`);
+        const cells = [...tbody.querySelectorAll(`td:nth-child(${col+1})`)];
+
+        headers.push(header);
+        cellsPerColumn.push(cells);
+    }
+
+    function updateSticky() {
+        const scrollLeft = wrapper.scrollLeft;
+
+        let left = 0;
+
+        for (let col = 0; col < numColumns; col++) {
+
+            const header = headers[col];
+            const cells = cellsPerColumn[col];
+
+            if (scrollLeft > 0) {
+                // STICK
+                header.style.position = 'sticky';
+                header.style.left = `${left}px`;
+                header.style.zIndex = 500;   // ALWAYS ABOVE other headers
+
+                cells.forEach(td => {
+                    td.style.position = 'sticky';
+                    td.style.left = `${left}px`;
+                    td.style.zIndex = 400;   // above normal cells
+                });
+
+            } else {
+                // RESET (no overlap when not scrolling)
+                header.style.position = '';
+                header.style.left = '';
+                header.style.zIndex = '';
+
+                cells.forEach(td => {
+                    td.style.position = '';
+                    td.style.left = '';
+                    td.style.zIndex = '';
+                });
+            }
+
+            left += header.offsetWidth;  // more stable than getBoundingClientRect
+        }
+    }
+
+    wrapper.addEventListener('scroll', updateSticky);
+    window.addEventListener('resize', updateSticky);
+
+    updateSticky();
+}
