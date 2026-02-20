@@ -6,6 +6,12 @@
 <link rel="stylesheet" href="styles/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
+<style>
+  tr.sortable { cursor: pointer; }
+  th.rotate { writing-mode: vertical-rl; transform: rotate(180deg); }
+  .heatmap-max { background-color: #ffd966; }
+  .sticky { position: sticky; top: 0; background: white; z-index: 2; }
+</style>
 </head>
 <body>
 
@@ -23,7 +29,7 @@
     <select id="eventTypeSelect"><option value="">Select Event Type</option></select>
   </label>
 
-  <label>Employee:
+  <label>Employee / Employee Type:
     <select id="employeeSelect"><option value="">All</option></select>
   </label>
 
@@ -42,14 +48,18 @@
   <div id="tableContainer"></div>
 </div>
 
-<div id="totalChartContainer" class="chart-container">
+<div id="totalChartContainer" class="chart-container" style="position:relative; height:400px;">
   <canvas id="totalChart"></canvas>
 </div>
 
+<footer>
+  © TICRA foundation
+</footer>
+
 <script type="module">
 import { 
-    setDefaultDateRange, fetchJson, createCell, applyHeatmap, 
-    sortTableByRow, renderBarChart, populateDropdown, applyStickyColumns 
+  setDefaultDateRange, fetchJson, createCell, sortTableByRow, 
+  populateDropdown, applyStickyColumns, renderBarChart
 } from './scripts/utils.js';
 
 const eventTypeSelect = document.getElementById("eventTypeSelect");
@@ -59,200 +69,291 @@ const endInput = document.getElementById("endTime");
 const form = document.getElementById("sessionForm");
 const tableContainer = document.getElementById("tableContainer");
 const totalChartCanvas = document.getElementById("totalChart");
+
+let chartDataStore = {};
 let sortState = {};
+let chartInstance;
 
 setDefaultDateRange('startTime','endTime',10);
 
-// Initialize dropdowns and load data
-async function init() {
-    await populateDropdown('eventTypeSelect','/sessionTypes','Select Event Type');
-    await populateDropdown('employeeSelect','/users','All');
-    fetchSessions();
+async function initDropdowns() {
+  await populateDropdown('eventTypeSelect','/sessionTypes','Select Event Type');
+
+  // Only fetch users once
+  const employeeTypes = await fetchJson('/employeeTypes');
+  const users = await fetchJson('/users');
+
+  employeeSelect.innerHTML = `<option value="">All</option>`;
+
+  if(employeeTypes.length){
+    const group = document.createElement("optgroup");
+    group.label = "Employee Types";
+    employeeTypes.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      opt.dataset.type = "employeeType";
+      group.appendChild(opt);
+    });
+    employeeSelect.appendChild(group);
+  }
+
+  if(users.length){
+    const uniqueUsers = [...new Set(users)];
+    const group = document.createElement("optgroup");
+    group.label = "Employees";
+    uniqueUsers.forEach(u => {
+      const opt = document.createElement("option");
+      opt.value = u;
+      opt.textContent = u;
+      opt.dataset.type = "user";
+      group.appendChild(opt);
+    });
+    employeeSelect.appendChild(group);
+  }
+
+  // Fetch sessions for initial view
+  fetchSessions();
 }
-init();
+
+initDropdowns();
 
 form.addEventListener('submit', e=>{
-    e.preventDefault();
-    fetchSessions();
+  e.preventDefault();
+  fetchSessions();
 });
 
-async function fetchSessions(){
-    const selectedEvent = eventTypeSelect.value;
-    if(!selectedEvent) return;
+function createRotatedHeader(text, sticky=false, isUser=false){
+  const th = document.createElement("th");
+  th.classList.add("rotate");
+  if(sticky) th.classList.add("sticky");
+  if(isUser) th.classList.add("user-cell");
+  const div = document.createElement("div");
+  div.textContent = text;
+  th.appendChild(div);
+  return th;
+}
 
-    const selectedUser = employeeSelect.value || null;
-    let url = `/session?eventType=${encodeURIComponent(selectedEvent)}&startTime=${encodeURIComponent(startInput.value)}&endTime=${encodeURIComponent(endInput.value)}`;
-    if(selectedUser) url += `&user_name=${encodeURIComponent(selectedUser)}`;
+function formatSecondsToHMS(sec){
+  const h = Math.floor(sec/3600).toString().padStart(2,'0');
+  const m = Math.floor((sec%3600)/60).toString().padStart(2,'0');
+  const s = Math.floor(sec%60).toString().padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
 
-    const data = await fetchJson(url);
-    const sessions = data.sessions || [];
+function applyColumnHeatmap(table) {
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  if (!rows.length) return;
 
-    const perEmployee = {};
-    if(!selectedUser){
-        sessions.forEach(s=>{
-            const user = s.user_name || "Unknown";
-            if(!perEmployee[user]) perEmployee[user] = [];
-            perEmployee[user].push(s);
-        });
-    } else {
-        perEmployee[selectedUser] = sessions;
+  const headerCells = table.querySelectorAll('thead th');
+  let firstUserColIndex = 0;
+  for (let i = 0; i < headerCells.length; i++) {
+    if (headerCells[i].classList.contains('user-cell')) {
+      firstUserColIndex = i;
+      break;
     }
+  }
 
-    renderTable(perEmployee);
-    renderChart(perEmployee);
+  for (let col = firstUserColIndex; col < headerCells.length; col++) {
+    const values = rows.map(r => parseFloat(r.children[col].dataset.sort)||0);
+    const maxVal = Math.max(...values);
+    rows.forEach(r=>{
+      const td = r.children[col];
+      td.classList.remove('heatmap-max');
+      if(td.dataset.sort && parseFloat(td.dataset.sort)===maxVal && maxVal>0) td.classList.add('heatmap-max');
+    });
+  }
 }
 
-// Rotated header helper
-function createRotatedHeader(text, sticky=false){
-    const th = document.createElement("th");
-    th.classList.add("rotate");
-    if(sticky) th.classList.add("sticky");
-    const div = document.createElement("div");
-    div.textContent = text;
-    th.appendChild(div);
-    return th;
+function attachSortableRows(table){
+  const headerCells = table.querySelectorAll('thead th');
+  let firstDataColIndex = 0;
+  for(let i=0;i<headerCells.length;i++){
+    if(headerCells[i].classList.contains('user-cell')){
+      firstDataColIndex=i;
+      break;
+    }
+  }
+  table.querySelectorAll('tbody tr').forEach(tr=>{
+    tr.classList.add('sortable');
+    tr.addEventListener('click',()=>{sortTableByRow(table,tr,sortState,firstDataColIndex); applyColumnHeatmap(table);});
+  });
 }
 
+// ---------------- TABLE ----------------
 function renderTable(perEmployee){
-    tableContainer.innerHTML = "";
-    const selectedUser = employeeSelect.value || null;
+  tableContainer.innerHTML="";
+  const selectedValue = employeeSelect.value || null;
+  const selectedOption = employeeSelect.querySelector(`option[value="${selectedValue}"]`);
+  const isType = selectedOption?.dataset.type==='employeeType';
 
-    if(!selectedUser) renderMultiUserTable(perEmployee);
-    else renderSingleUserTable(perEmployee[selectedUser]);
-
-    applyHeatmap("#tableContainer table");
+  if(!selectedValue) renderMultiUserTable(perEmployee);        // All
+  else if(isType) renderMultiUserTable(perEmployee, selectedValue); // Employee type table (same as before)
+  else renderSingleUserTable(perEmployee[selectedValue]);      // Individual employee sessions
 }
 
-function renderMultiUserTable(perEmployee){
-    const allTabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
-    const employeeNames = Object.keys(perEmployee).sort();
-    if(!allTabs.length || !employeeNames.length){
-        tableContainer.innerHTML="<p>No sessions found.</p>"; 
-        return;
-    }
+// ---------------- MULTI USER TABLE ----------------
+function renderMultiUserTable(perEmployee, filterType=null){
+  let users = Object.keys(perEmployee).sort();
+  if(filterType) users = users.filter(u=> u_type_matches(u, filterType));
 
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    const tbody = document.createElement("tbody");
+  const allTabs = [...new Set(Object.values(perEmployee).flatMap(sess=>sess.map(s=>s.tab)))].sort();
+  if(!allTabs.length){ tableContainer.innerHTML="<p>No sessions found.</p>"; return; }
 
-    const headerRow = document.createElement("tr");
-    // First 4 sticky columns: Tab, TOTAL, AVERAGE
-    headerRow.appendChild(createRotatedHeader("Tab", true));
-    headerRow.appendChild(createRotatedHeader("TOTAL", true));
-    headerRow.appendChild(createRotatedHeader("AVERAGE", true));
-    employeeNames.forEach(u => headerRow.appendChild(createRotatedHeader(u)));
-    thead.appendChild(headerRow);
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
 
-    allTabs.forEach(tab=>{
-        const tr = document.createElement("tr");
-        tr.dataset.tab = tab;
-        tr.classList.add('sortable');
+  const headerRow = document.createElement("tr");
+  headerRow.appendChild(createRotatedHeader("Tab", true));
+  headerRow.appendChild(createRotatedHeader("TOTAL", true));
+  headerRow.appendChild(createRotatedHeader("AVERAGE", true));
+  users.forEach(u=>headerRow.appendChild(createRotatedHeader(u,false,true)));
+  thead.appendChild(headerRow);
 
-        // Tab column
-        tr.appendChild(createCell(tab, false, '', 'sticky'));
+  allTabs.forEach((tab,idx)=>{
+    const tr = document.createElement("tr");
+    tr.dataset.tab = tab;
+    tr.classList.add(idx%2===0?'eventtype-row-white':'eventtype-row-gray');
 
-        // TOTAL and AVERAGE
-        let total=0;
-        employeeNames.forEach(u=>{
-            const val = perEmployee[u].find(s=>s.tab===tab)?.durationSeconds||0;
-            total += val;
-        });
-        tr.appendChild(createCell(Math.round(total), true, '', 'sticky'));
-        tr.appendChild(createCell((total/employeeNames.length).toFixed(2), true, '', 'sticky'));
+    tr.appendChild(createCell(tab,false,null,'operation-cell'));
 
-        // Employee columns
-        employeeNames.forEach(u=>{
-            const val = perEmployee[u].find(s=>s.tab===tab)?.durationSeconds||0;
-            tr.appendChild(createCell(Math.round(val)));
-        });
-
-        tbody.appendChild(tr);
-        tr.addEventListener('click', ()=>sortTableByRow(table,tr,sortState));
+    const counts = users.map(u=>{
+      return perEmployee[u].reduce((sum,s)=> s.tab===tab?sum+s.durationSeconds:sum,0);
     });
 
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    tableContainer.appendChild(table);
+    const total = counts.reduce((a,b)=>a+b,0);
+    const avg = counts.length?total/counts.length:0;
 
-    
-    applyStickyColumns(table, 3);
+    tr.appendChild(createCell(formatSecondsToHMS(total),false,null,'summary-cell'));
+    tr.appendChild(createCell(formatSecondsToHMS(avg),false,null,'summary-cell'));
+
+    counts.forEach(val=>{
+      const td = createCell(formatSecondsToHMS(val),false,null,'user-cell');
+      td.dataset.sort=val;
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  tableContainer.appendChild(table);
+  applyStickyColumns(table,3);
+  attachSortableRows(table);
+  applyColumnHeatmap(table);
 }
 
+// ---------------- SINGLE USER TABLE ----------------
 function renderSingleUserTable(sessions){
-    const sessionIds = [...new Set(sessions.map(s=>s.session_id))].sort();
-    const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
-    if(!sessions.length){
-        tableContainer.innerHTML="<p>No sessions found for this employee.</p>"; 
-        return;
-    }
+  if(!sessions.length){ 
+    tableContainer.innerHTML="<p>No sessions found.</p>"; 
+    return; 
+  }
 
-    const table = document.createElement("table");
-    const thead = document.createElement("thead");
-    const tbody = document.createElement("tbody");
+  const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
 
-    const headerRow = document.createElement("tr");
-    headerRow.appendChild(createRotatedHeader("Tab", true));
-    headerRow.appendChild(createRotatedHeader("TOTAL", true));
-    headerRow.appendChild(createRotatedHeader("AVERAGE", true));
-    sessionIds.forEach(id => headerRow.appendChild(createRotatedHeader(id)));
-    thead.appendChild(headerRow);
+  const sessionIds = [...new Set(sessions.map(s=>s.session_id))].sort();
 
-    tabs.forEach(tab=>{
-        const tr = document.createElement("tr");
-        tr.dataset.tab = tab;
-        tr.appendChild(createCell(tab,false,'sticky'));
+  // --- HEADER ---
+  const headerRow = document.createElement("tr");
+  headerRow.appendChild(createRotatedHeader("Tab", true));
+  headerRow.appendChild(createRotatedHeader("TOTAL", true));      // 2nd column for heatmap
+  headerRow.appendChild(createRotatedHeader("AVERAGE", true));    // 3rd column for heatmap
+  sessionIds.forEach(id => headerRow.appendChild(createRotatedHeader(id,false,true)));
+  thead.appendChild(headerRow);
 
-        // TOTAL and AVERAGE
-        let total=0;
-        sessionIds.forEach(id=>{
-            const val = sessions.find(s=>s.tab===tab && s.session_id===id)?.durationSeconds||0;
-            total += val;
-        });
-        tr.appendChild(createCell(Math.round(total),true,'','sticky'));
-        tr.appendChild(createCell((total/sessionIds.length).toFixed(2),true,'','sticky'));
+  // --- BODY ---
+  tabs.forEach((tab,idx)=>{
+    const tr = document.createElement("tr");
+    tr.dataset.tab=tab;
+    tr.classList.add(idx%2===0?'eventtype-row-white':'eventtype-row-gray');
+    
+    tr.appendChild(createCell(tab,false,null,'operation-cell'));
 
-        // Session columns
-        sessionIds.forEach(id=>{
-            const val = sessions.find(s=>s.tab===tab && s.session_id===id)?.durationSeconds||0;
-            tr.appendChild(createCell(Math.round(val)));
-        });
-
-        tbody.appendChild(tr);
-        tr.addEventListener('click', ()=>sortTableByRow(table,tr,sortState));
+    // Calculate total for the tab across all sessions
+    let total=0;
+    const sessionValues = sessionIds.map(id=>{
+      const matchingSessions = sessions.filter(s=>s.tab===tab && s.session_id===id);
+      const val = matchingSessions.reduce((sum,s)=>sum+s.durationSeconds,0);
+      total += val;
+      return val;
     });
 
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    tableContainer.appendChild(table);
+    // --- TOTAL & AVERAGE columns first ---
+    tr.appendChild(createCell(formatSecondsToHMS(total),false,null,'summary-cell'));               // 2nd column
+    tr.appendChild(createCell(formatSecondsToHMS(total/sessionIds.length),false,null,'summary-cell')); // 3rd column
 
-    applyStickyColumns(table, 3);
+    // --- session columns ---
+    sessionValues.forEach(val=>{
+      const td = createCell(formatSecondsToHMS(val),false,null,'user-cell');
+      td.dataset.sort = val;
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  tableContainer.appendChild(table);
+  
+  applyStickyColumns(table,3);   // sticky for first 3 columns
+  attachSortableRows(table);
+  applyColumnHeatmap(table);     // now heatmap will apply correctly to 2nd & 3rd columns
 }
 
-function renderChart(perEmployee){
-    const selectedUser = employeeSelect.value || null;
-    let labels=[], totals=[];
-    if(!selectedUser){
-        const tabs = [...new Set(Object.values(perEmployee).flatMap(sess => sess.map(s => s.tab)))].sort();
-        labels = tabs;
-        totals = tabs.map(tab => Object.keys(perEmployee).reduce((sum,user) => sum + (perEmployee[user].find(s=>s.tab===tab)?.durationSeconds||0),0));
-    } else {
-        const sessions = perEmployee[selectedUser];
-        const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
-        labels = tabs;
-        totals = tabs.map(tab=>sessions.filter(s=>s.tab===tab).reduce((sum,s)=>sum+s.durationSeconds,0));
-    }
+// ---------------- FETCH ----------------
+async function fetchSessions(){
+  const selectedEvent = eventTypeSelect.value;
+  if(!selectedEvent) return;
 
-    const colors = labels.map(_=>`rgb(${Math.random()*200},${Math.random()*200},${Math.random()*200})`);
-    renderBarChart(totalChartCanvas, labels, totals, colors, {
-        responsive:true,
-        plugins:{legend:{display:false}, title:{display:true,text:'Total Duration per Tab'}},
-        scales:{y:{beginAtZero:true}}
-    });
+  const selectedValue = employeeSelect.value || null;
+  let url = `/session?eventType=${encodeURIComponent(selectedEvent)}&startTime=${encodeURIComponent(startInput.value)}&endTime=${encodeURIComponent(endInput.value)}`;
+
+  const selectedOption = employeeSelect.querySelector(`option[value="${selectedValue}"]`);
+  const isType = selectedOption?.dataset.type==='employeeType';
+
+  if(isType) url+=`&employee_type=${encodeURIComponent(selectedValue)}`;
+  else if(selectedValue) url+=`&user_name=${encodeURIComponent(selectedValue)}`;
+
+  const data = await fetchJson(url);
+  const sessions = data.sessions || [];
+
+  const perEmployee = {};
+  sessions.forEach(s=>{
+    const user = s.user_name || "Unknown";
+    if(!perEmployee[user]) perEmployee[user]=[];
+    perEmployee[user].push(s);
+  });
+
+  chartDataStore=perEmployee;
+  renderTable(perEmployee);
+  renderChart();
+}
+
+// ---------------- CHART ----------------
+function renderChart(){
+  const perEmployee=chartDataStore;
+  if(!perEmployee) return;
+  const labels = [...new Set(Object.values(perEmployee).flatMap(sess=>sess.map(s=>s.tab)))].sort();
+  const totals = labels.map(tab=>Object.keys(perEmployee).reduce((sum,u)=>sum+(perEmployee[u].reduce((a,s)=>s.tab===tab?a+s.durationSeconds:a,0)),0));
+  const colors = labels.map(_=>`rgb(${Math.random()*200},${Math.random()*200},${Math.random()*200})`);
+  if(chartInstance) chartInstance.destroy();
+  chartInstance = renderBarChart(totalChartCanvas, labels, totals, colors,{responsive:true,animation:false,maintainAspectRatio:false,scales:{y:{beginAtZero:true}}});
+}
+
+// ---------------- UTILITY ----------------
+function u_type_matches(userName, typeName){
+  // placeholder, replace with real mapping if needed
+  return true; 
 }
 </script>
 
-<footer>
-    © TICRA foundation
-</footer>
 </body>
 </html>

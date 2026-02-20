@@ -19,23 +19,26 @@
 <h1>Event Pool Viewer</h1>
 
 <div id="filters">
-    <label>Event type:
-        <select id="eventType"><option value="">Select event</option></select>
-    </label>
+    <div>
+        <label>Start date:
+            <input type="date" id="startDate">
+        </label>
+        <label>End date:
+            <input type="date" id="endDate">
+        </label>
+        <button id="applyButton">Apply</button>
+    </div>
 
-    <label>Employee type:
-        <select id="employeeType"><option value="">All</option></select>
-    </label>
+    <div>
+        <strong>Event types:</strong>
+        <div id="eventTypeGroup" class="checkbox-group"></div>
+    </div>
 
-    <label>Start date:
-        <input type="date" id="startDate">
-    </label>
+    <div>
+        <strong>Employee types:</strong>
+        <div id="employeeTypeGroup" class="checkbox-group"></div>
+    </div>
 
-    <label>End date:
-        <input type="date" id="endDate">
-    </label>
-
-    <button id="applyButton">Apply</button>
 </div>
 
 <div id="tableContainerWrapper">
@@ -47,83 +50,116 @@
     </div>
 </div>
 
-<div id="totalChartContainer">
-    <canvas id="totalChart"></canvas>
-</div>
+<div id="multiChartContainer"></div>
 
 <footer>
     © TICRA foundation
 </footer>
 
 <script type="module">
-import { COLORS, setDefaultDateRange, fetchJson, populateDropdown, createHeader, createCell, applyHeatmap, sortTableByRow, renderBarChart, applyStickyColumns } from './scripts/utils.js';
+import { COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, renderMultipleBarCharts, applyStickyColumns } from './scripts/utils.js';
 
 const STATE = {
     fullEvents: [],
-    filteredEvents: [],
     activeUsers: [],
     userOrder: [],
-    rowSortStates: {}
+    rowSortStates: {},
+    eventTypeOrder: [],
+    allEmployeeTypes: []
 };
 
 setDefaultDateRange('startDate','endDate',10);
-populateDropdown('eventType','/eventQueries','Select event');
 
-document.getElementById('applyButton').addEventListener('click', loadData);
-document.getElementById('employeeType').addEventListener('change', applyFilters);
-document.getElementById('eventType').addEventListener('change', () => {
-    document.getElementById('employeeType').value = '';
-});
-
-// Create rotated header
-function createRotatedHeader(text){
-    const th = document.createElement('th');
-    th.classList.add('rotate', 'sticky'); // sticky will be applied later
-    const div = document.createElement('div');
-    div.textContent = text;
-    th.appendChild(div);
-    return th;
+// ------------------------
+// LOAD FILTER CHECKBOXES
+// ------------------------
+async function loadEventTypes() {
+    const data = await fetchJson('/eventQueries');
+    const container = document.getElementById('eventTypeGroup');
+    container.innerHTML = '';
+    data.forEach(ev => {
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = ev;
+        input.checked = true;
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(ev));
+        container.appendChild(label);
+    });
 }
 
-async function loadData(){
-    const eventType = document.getElementById('eventType').value;
-    if(!eventType) return;
+async function loadEmployeeTypes() {
+    const data = await fetchJson('/employeeTypes');
+    STATE.allEmployeeTypes = data.sort();
+    const container = document.getElementById('employeeTypeGroup');
+    container.innerHTML = '';
+    STATE.allEmployeeTypes.forEach(emp=>{
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = emp;
+        input.checked = true;
+        input.classList.add('employee-checkbox');
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(emp));
+        container.appendChild(label);
+    });
+}
 
+function getCheckedEmployeeTypes(){
+    const checkboxes = Array.from(document.querySelectorAll('#employeeTypeGroup input.employee-checkbox'));
+    const checked = checkboxes.filter(b => b.checked).map(b => b.value);
+    return checked.length === checkboxes.length ? null : checked;
+}
+
+function getCheckedValues(containerId){
+    return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(i=>i.value);
+}
+
+// ------------------------
+// APPLY BUTTON: LOAD DATA
+// ------------------------
+document.getElementById('applyButton').addEventListener('click', async () => {
+    const selectedEventTypes = getCheckedValues('eventTypeGroup');
+    if(selectedEventTypes.length===0) return;
+
+    const selectedEmployees = getCheckedEmployeeTypes();
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
 
-    let url = `/data?inputEventType=${encodeURIComponent(eventType)}`;
-    if(startDate) url += `&startTime=${encodeURIComponent(startDate+'T00:00:00')}`;
-    if(endDate) url += `&endTime=${encodeURIComponent(endDate+'T23:59:59')}`;
+    STATE.fullEvents = [];
+    STATE.eventTypeOrder = [];
 
-    const data = await fetchJson(url);
+    for(const eventType of selectedEventTypes){
+        const params = new URLSearchParams();
+        params.append('inputEventType', eventType);
+        if(startDate) params.append('startTime', startDate+'T00:00:00');
+        if(endDate) params.append('endTime', endDate+'T23:59:59');
+        if(selectedEmployees) selectedEmployees.forEach(emp => params.append('employeeType', emp));
 
-    STATE.fullEvents = data.events.map(ev => ({
-        user: ev.user_name ?? "unknown",
-        selection: String(Object.values(ev.payload)[0] ?? "unknown"),
-        employee_type: ev.employee_type ?? "unknown",
-        count: ev.count ?? 0
-    }));
+        const url = `/data?${params.toString()}`;
+        const data = await fetchJson(url);
 
-    populateEmployeeTypes();
-    applyFilters();
-}
+        const events = data.events.map(ev=>({
+            eventType,
+            user: ev.user_name ?? "unknown",
+            selection: String(Object.values(ev.payload)[0] ?? "unknown"),
+            employee_type: ev.employee_type ?? "unknown",
+            count: ev.count ?? 0
+        }));
 
-function populateEmployeeTypes() {
-    const sel = document.getElementById('employeeType');
-    const current = sel.value;
-    const types = [...new Set(STATE.fullEvents.map(e=>e.employee_type).filter(Boolean))].sort();
-    sel.innerHTML = '<option value="">All</option>';
-    types.forEach(t => sel.appendChild(new Option(t,t)));
-    if(types.includes(current)) sel.value = current;
-}
+        STATE.fullEvents.push(...events);
+        STATE.eventTypeOrder.push(eventType);
+    }
 
-function applyFilters() {
-    const emp = document.getElementById('employeeType').value;
-    STATE.filteredEvents = STATE.fullEvents.filter(ev => !emp || ev.employee_type === emp);
-    renderTableAndChart();
-}
+    STATE.eventTypeOrder = [...new Set(STATE.eventTypeOrder)];
+    renderTableAndCharts();
+});
 
+// ------------------------
+// BUILD PER-USER DATA
+// ------------------------
 function buildPerUser(events){
     const perUser = {};
     const totals = {};
@@ -133,7 +169,9 @@ function buildPerUser(events){
 
     STATE.activeUsers.forEach(u => perUser[u] = {});
     events.forEach(e => {
-        if(totals[e.user]>0) perUser[e.user][e.selection] = (perUser[e.user][e.selection]??0)+e.count;
+        if(totals[e.user]>0)
+            perUser[e.user][`${e.eventType}::${e.selection}`] =
+                (perUser[e.user][`${e.eventType}::${e.selection}`]??0)+e.count;
     });
     return perUser;
 }
@@ -142,83 +180,95 @@ function getSelections(perUser) {
     return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort();
 }
 
-function calculateColumnMax(perUser, selections) {
-    const maxValues = {};
-    STATE.userOrder.forEach(u => maxValues[u] = Math.max(...selections.map(s => perUser[u]?.[s]??0),0));
-    return maxValues;
-}
-
+// ------------------------
+// DRAW BIG TABLE
+// ------------------------
 function drawTable(perUser,selections){
+    const table = document.getElementById('bigTable');
     const thead = document.querySelector('#bigTable thead');
     const tbody = document.querySelector('#bigTable tbody');
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
+    thead.innerHTML='';
+    tbody.innerHTML='';
 
     const headerRow = document.createElement('tr');
-
-    // First 4 sticky columns: Operation, MOST USED, AVERAGE, TOTAL
-    headerRow.appendChild(createRotatedHeader('Operation'));
-    headerRow.appendChild(createRotatedHeader('MOST USED'));
-    headerRow.appendChild(createRotatedHeader('AVERAGE'));
-    headerRow.appendChild(createRotatedHeader('TOTAL'));
-
-    STATE.userOrder.forEach(u => headerRow.appendChild(createRotatedHeader(u)));
+    ['Operation','MOST USED','AVERAGE','TOTAL',...STATE.userOrder].forEach(text=>{
+        const th = document.createElement('th');
+        th.classList.add('rotate','sticky');
+        const div = document.createElement('div');
+        div.textContent=text;
+        th.appendChild(div);
+        headerRow.appendChild(th);
+    });
     thead.appendChild(headerRow);
 
-    const columnMax = calculateColumnMax(perUser,selections);
+    STATE.eventTypeOrder.forEach((eventType, idx)=>{
+        const eventSelections = selections.filter(s=>s.startsWith(eventType+'::'));
+        const rowClass = idx%2===0?'eventtype-row-white':'eventtype-row-gray';
 
-    selections.forEach(sel=>{
-        const tr = document.createElement('tr');
-        tr.classList.add('sortable');
-        tr.dataset.operation = sel;
-
-        tr.appendChild(createCell(sel,false,'','operation-cell'));
-
-        // MOST USED
-        let total=0;
-        STATE.userOrder.forEach(u=>total += perUser[u]?.[sel]??0);
-
-        const avg = STATE.userOrder.length ? (total/STATE.userOrder.length).toFixed(2) : 0;
-
-        let mostUsed=0;
+        const columnMax = {};
         STATE.userOrder.forEach(u=>{
-            const userMax = Math.max(...selections.map(s=>perUser[u]?.[s]??0));
-            if((perUser[u]?.[sel]??0)===userMax && userMax>0) mostUsed++;
+            columnMax[u]=Math.max(...eventSelections.map(sel=>perUser[u]?.[sel]??0),0);
         });
 
-        tr.appendChild(createCell(mostUsed,true));
-        tr.appendChild(createCell(avg,true));
-        tr.appendChild(createCell(total,true));
+        eventSelections.forEach(sel=>{
+            const tr = document.createElement('tr');
+            tr.classList.add('sortable',rowClass);
+            const displayName = sel.split('::')[1];
+            tr.dataset.operation = displayName;
 
-        // User columns
-        STATE.userOrder.forEach(u=>{
-            const val = perUser[u]?.[sel]??0;
-            tr.appendChild(createCell(val,false,cellColor(val,columnMax[u])));
+            tr.appendChild(createCell(displayName,false,null,'operation-cell'));
+
+            const total = STATE.userOrder.reduce((sum,u)=>sum+(perUser[u]?.[sel]??0),0);
+            const avg = STATE.userOrder.length ? (total/STATE.userOrder.length).toFixed(2) : 0;
+
+            let mostUsed = 0;
+            STATE.userOrder.forEach(u=>{
+                if((perUser[u]?.[sel]??0)===columnMax[u] && columnMax[u]>0) mostUsed++;
+            });
+
+            tr.appendChild(createCell(mostUsed,false,null,'summary-cell'));
+            tr.appendChild(createCell(avg,false,null,'summary-cell'));
+            tr.appendChild(createCell(total,false,null,'summary-cell'));
+
+            STATE.userOrder.forEach(u=>{
+                const val = perUser[u]?.[sel]??0;
+                const td = createCell(val,false,null,'user-cell');
+                if(val>0 && val===columnMax[u]) td.classList.add('heatmap-max');
+                tr.appendChild(td);
+            });
+
+            tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,4));
+            tbody.appendChild(tr);
         });
-
-        tr.addEventListener('click',()=>sortTableByRow(document.querySelector('#bigTable'),tr,STATE.rowSortStates));
-        tbody.appendChild(tr);
     });
 
-    applyHeatmap('#bigTable');
-
-    // Make first 4 columns sticky
-    applyStickyColumns(document.querySelector('#bigTable'), 4);
+    applyStickyColumns(table,4);
 }
 
-function cellColor(value,max){ 
-    const g = max>0?Math.round(255-(value/max)*100):255;
-    return `rgb(${g},255,${g})`;
-}
-
-function renderTableAndChart(){
-    const perUser = buildPerUser(STATE.filteredEvents);
+// ------------------------
+// RENDER TABLE + CHARTS
+// ------------------------
+function renderTableAndCharts(){
+    const perUser = buildPerUser(STATE.fullEvents);
     const selections = getSelections(perUser);
     drawTable(perUser,selections);
 
-    const totals = selections.map(sel=>STATE.userOrder.reduce((sum,u)=>sum+(perUser[u]?.[sel]??0),0));
-    renderBarChart(document.getElementById('totalChart'), selections, totals, COLORS, {plugins:{legend:{position:'bottom'}}, responsive:false, animation:false});
+    const showPercentage = document.getElementById('percentageToggle')?.checked ?? false;
+    const chartContainer = document.getElementById('multiChartContainer');
+
+    // Charts: split max 2 per row
+    chartContainer.style.display='grid';
+    chartContainer.style.gridTemplateColumns='repeat(2, 1fr)';
+    chartContainer.style.gap='20px';
+
+    renderMultipleBarCharts(chartContainer, perUser, STATE.eventTypeOrder, COLORS, showPercentage);
 }
+
+
+// INITIAL LOAD
+loadEventTypes();
+loadEmployeeTypes();
+
 </script>
 
 </body>

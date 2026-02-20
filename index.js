@@ -3,7 +3,7 @@ import express from 'express';
 import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
 import { getSessionType } from './database/session.js';
-import { getUsers } from './database/user.js';
+import { getUsers, getEmployeeTypes } from './database/user.js';
 import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from './database/datapool.js';
 import { appendJson, deleteJson, updateJson } from './database/config/configManager.js';
 import { getEventQueries } from './database/eventQueries.js';
@@ -88,6 +88,18 @@ app.get('/users', async (req, res) => {
 });
 
 
+app.get("/employeeTypes", async (req, res) => {
+  try {
+    const types = await getEmployeeTypes();
+    res.json(types);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
 app.get("/data", async (req, res) => {
   try {
     const { startTime, endTime, employeeType, inputEventType } = req.query;
@@ -102,19 +114,20 @@ app.get("/data", async (req, res) => {
 
 app.get("/session", async (req, res) => {
   try {
-    const { startTime, endTime, user_name, eventType } = req.query;
-
+    const { startTime, endTime, user_name, eventType, employee_type } = req.query;
     if (!eventType) {
       return res.status(400).json({ error: "eventType query parameter is required" });
     }
 
-    const data = await sessionFetchByQueries({ eventType, startTime, endTime, user_name });
+    const data = await sessionFetchByQueries({ eventType, startTime, endTime, user_name, employee_type });
+
     res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 app.get("/sessionTimeline", async (req, res) => {
