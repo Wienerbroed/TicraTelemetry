@@ -38,7 +38,6 @@
         <strong>Employee types:</strong>
         <div id="employeeTypeGroup" class="checkbox-group"></div>
     </div>
-
 </div>
 
 <div id="tableContainerWrapper">
@@ -185,11 +184,12 @@ function getSelections(perUser) {
 // ------------------------
 function drawTable(perUser,selections){
     const table = document.getElementById('bigTable');
-    const thead = document.querySelector('#bigTable thead');
-    const tbody = document.querySelector('#bigTable tbody');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
     thead.innerHTML='';
     tbody.innerHTML='';
 
+    // CREATE HEADER
     const headerRow = document.createElement('tr');
     ['Operation','MOST USED','AVERAGE','TOTAL',...STATE.userOrder].forEach(text=>{
         const th = document.createElement('th');
@@ -201,6 +201,7 @@ function drawTable(perUser,selections){
     });
     thead.appendChild(headerRow);
 
+    // POPULATE BODY
     STATE.eventTypeOrder.forEach((eventType, idx)=>{
         const eventSelections = selections.filter(s=>s.startsWith(eventType+'::'));
         const rowClass = idx%2===0?'eventtype-row-white':'eventtype-row-gray';
@@ -243,6 +244,65 @@ function drawTable(perUser,selections){
     });
 
     applyStickyColumns(table,4);
+
+    // SHOW DOWNLOAD BUTTON ONLY IF DATA EXISTS
+    toggleDownloadButton(tbody.children.length > 0);
+}
+
+// ------------------------
+// CSV DOWNLOAD FUNCTION
+// ------------------------
+function downloadBigTableAsCSV() {
+    const table = document.getElementById('bigTable');
+    if (!table) return;
+
+    const rows = [];
+
+    // HEADER
+    table.querySelectorAll('thead tr').forEach(tr => {
+        const cells = Array.from(tr.querySelectorAll('th'));
+        const rowData = cells.map(cell => cell.innerText.trim().replace(/[\r\n\t]+/g,' '));
+        rows.push(rowData.join(';'));
+    });
+
+    // BODY
+    table.querySelectorAll('tbody tr').forEach(tr => {
+        const cells = Array.from(tr.querySelectorAll('td'));
+        const rowData = cells.map(cell => cell.innerText.trim().replace(/[\r\n\t]+/g,' '));
+        rows.push(rowData.join(';'));
+    });
+
+    const csvContent = '\uFEFF' + rows.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'event_pool_data.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ------------------------
+// ADD DOWNLOAD BUTTON
+// ------------------------
+const downloadBtn = document.createElement('button');
+downloadBtn.textContent = 'Download CSV';
+downloadBtn.style.margin = '20px auto';  // center horizontally
+downloadBtn.style.padding = '2px 2px';
+downloadBtn.style.fontSize = '16px';
+downloadBtn.style.cursor = 'pointer';
+downloadBtn.style.display = 'none';      // initially hidden
+downloadBtn.addEventListener('click', downloadBigTableAsCSV);
+
+// Add below table wrapper
+document.getElementById('tableContainerWrapper').append(downloadBtn);
+
+// Function to toggle button visibility
+function toggleDownloadButton(show){
+    downloadBtn.style.display = show ? 'block' : 'none';  // must be valid CSS value
 }
 
 // ------------------------
@@ -256,7 +316,6 @@ function renderTableAndCharts(){
     const showPercentage = document.getElementById('percentageToggle')?.checked ?? false;
     const chartContainer = document.getElementById('multiChartContainer');
 
-    // Charts: split max 2 per row
     chartContainer.style.display='grid';
     chartContainer.style.gridTemplateColumns='repeat(2, 1fr)';
     chartContainer.style.gap='20px';
@@ -264,8 +323,9 @@ function renderTableAndCharts(){
     renderMultipleBarCharts(chartContainer, perUser, STATE.eventTypeOrder, COLORS, showPercentage);
 }
 
-
+// ------------------------
 // INITIAL LOAD
+// ------------------------
 loadEventTypes();
 loadEmployeeTypes();
 
