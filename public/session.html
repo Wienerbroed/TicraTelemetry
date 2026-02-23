@@ -6,6 +6,45 @@
 <link rel="stylesheet" href="styles/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
+<style>
+/* Timeline-specific styling only */
+.timeline-wrapper {
+    margin-top: 20px;
+    width: 100%;           /* Full width of container */
+    max-width: 1200px;     /* Max width of timeline visible */
+    overflow-x: auto;      /* Scroll if content overflows */
+    border-top: 3px solid #ccc;
+    padding-top: 20px;
+    position: relative;    /* Ensure timeline stays in bounds */
+}
+.timeline {
+    display: flex;
+    align-items: flex-start;
+    height: 80px;
+    min-width: 1200px;  /* ensures timeline boxes maintain minimum width */
+    width: max-content;  /* width grows with content but respects wrapper scroll */
+}
+.event-box { display:flex; align-items:center; justify-content:center; height:60px; color:white; font-size:12px; border-radius:6px; margin-right:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.2s;}
+.event-box:hover { opacity:0.85; }
+/* Timeline summary top text */
+#timelineSummary {
+    text-align: center;
+    margin-bottom: 15px;
+}
+/* Timeline legend bottom text */
+#timelineLegend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 40px;
+    text-align: center;
+}
+.legend { margin-top:25px; display:flex; gap:40px; }
+.legend-column { display:flex; flex-direction: column; align-items:center; gap:8px; }
+.legend-title { font-weight:bold; margin-bottom:6px; }
+.legend-item { display:flex; align-items:center; font-size:13px; }
+.legend-color { width:15px; height:15px; margin-right:6px; border-radius:3px; }
+</style>
 </head>
 <body>
 
@@ -47,7 +86,6 @@
     </table>
   </div>
 
-  <!-- Download CSV button is now in the DOM -->
   <button id="downloadBtn" style="
       margin:20px auto;
       padding:4px 8px;
@@ -55,6 +93,16 @@
       cursor:pointer;
       display:none;
   ">Download CSV</button>
+</div>
+
+<!-- Timeline container (hidden by default) -->
+<div id="timelineContainer" style="display:none; margin:20px 0;">
+  <h3>Session Timeline</h3>
+  <div id="timelineSummary"></div>
+  <div class="timeline-wrapper">
+    <div id="timeline" class="timeline"></div>
+  </div>
+  <div id="timelineLegend" class="legend"></div>
 </div>
 
 <div id="multiChartContainer" class="chart-container"></div>
@@ -83,6 +131,11 @@ const startInput = document.getElementById("startTime");
 const endInput = document.getElementById("endTime");
 const applyButton = document.getElementById("applyButton");
 const downloadBtn = document.getElementById("downloadBtn");
+
+const timelineContainer = document.getElementById('timelineContainer');
+const timelineSummary = document.getElementById('timelineSummary');
+const timelineDiv = document.getElementById('timeline');
+const timelineLegend = document.getElementById('timelineLegend');
 
 setDefaultDateRange('startTime','endTime',10);
 
@@ -170,6 +223,7 @@ function renderTableAndCharts(selectedEmployee=null, isType=false){
         table.querySelector('tbody').innerHTML='';
         document.getElementById('multiChartContainer').innerHTML='';
         toggleDownloadButton(false);
+        timelineContainer.style.display = 'none';
         return;
     }
 
@@ -212,11 +266,19 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
     }
 
     const headerRow = document.createElement('tr');
-    ['Operation','AVERAGE','TOTAL',...columns].forEach(text=>{
+    ['Operation','AVERAGE','TOTAL',...columns].forEach((text, idx)=>{
         const th = document.createElement('th');
         th.classList.add('rotate','sticky');
         const div = document.createElement('div');
         div.textContent=text;
+
+        // Make session ID headers clickable only for individual employee view
+        if(selectedEmployee && !isType && idx >= 3){ 
+            div.style.cursor = "pointer";
+            div.style.textDecoration = "underline";
+            div.addEventListener('click', ()=> loadTimeline(text));
+        }
+
         th.appendChild(div);
         headerRow.appendChild(th);
     });
@@ -272,8 +334,7 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
     chartContainer.style.gridTemplateColumns='repeat(2,1fr)';
     chartContainer.style.gap='20px';
 
-    // Flip: one chart per employee/session
-    columns.forEach(col => {
+    columns.forEach(col=>{
         const chartWrapper = document.createElement('div');
         chartWrapper.style.border = '1px solid #ddd';
         chartWrapper.style.borderRadius = '6px';
@@ -284,7 +345,7 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
         chartWrapper.style.alignItems = 'center';
 
         const title = document.createElement('strong');
-        title.textContent = col; // user name or session ID
+        title.textContent = col;
         chartWrapper.appendChild(title);
 
         const toggleWrapper = document.createElement('label');
@@ -300,15 +361,13 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
         chartWrapper.appendChild(canvas);
         chartContainer.appendChild(chartWrapper);
 
-        const renderChart = () => {
-            const labels = tabs; // event types as labels
-            let data = tabs.map(tab => {
+        const renderChart = ()=>{
+            const labels = tabs;
+            let data = tabs.map(tab=>{
                 if(selectedEmployee && !isType){
-                    // single employee → session columns
                     return STATE.fullSessions.filter(s=>s.session_id===col && s.tab===tab)
                         .reduce((sum,s)=>sum+s.durationSeconds,0);
                 } else {
-                    // all users
                     return perUser[col]?.filter(s=>s.tab===tab).reduce((sum,s)=>sum+s.durationSeconds,0) || 0;
                 }
             });
@@ -337,7 +396,6 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
     });
 }
 
-
 // ------------------------
 // CSV DOWNLOAD
 // ------------------------
@@ -364,6 +422,90 @@ downloadBtn.addEventListener('click', ()=>{
 });
 
 function toggleDownloadButton(show){ downloadBtn.style.display = show ? 'block' : 'none'; }
+
+// ------------------------
+// TIMELINE LOGIC
+// ------------------------
+const colorMap = {};
+function getColor(eventType, payload) {
+    const key = payload ? `${eventType}-${JSON.stringify(payload)}` : `${eventType}-null`;
+    if(!colorMap[key]){
+        const hue = (Object.keys(colorMap).length * 100) % 360;
+        colorMap[key] = payload ? `hsl(${hue},50%,40%)` : "#888";
+    }
+    return colorMap[key];
+}
+
+async function loadTimeline(sessionId){
+    timelineContainer.style.display = 'block';
+    timelineSummary.innerHTML = timelineDiv.innerHTML = timelineLegend.innerHTML = '';
+    Object.keys(colorMap).forEach(k=>delete colorMap[k]);
+
+    const response = await fetch(`/sessionTimeline?sessionId=${sessionId}`);
+    const data = await response.json();
+
+    if(!data.timeline || !data.timeline.length){
+        timelineSummary.innerHTML = '<p>No events found for this session.</p>';
+        return;
+    }
+
+    const totalDuration = data.totalDurationSeconds || 1;
+
+    // Summary
+    timelineSummary.innerHTML = `<div class="summary">
+      <strong>User:</strong> ${data.user_name}<br/>
+      <strong>Employee Type:</strong> ${data.employee_type}<br/>
+      <strong>Total Events:</strong> ${data.totalEvents}<br/>
+      <strong>Total Duration:</strong> ${Math.round(totalDuration)} seconds
+    </div>`;
+
+    const MIN_TOTAL_WIDTH = 1200;
+    const timelineTotalWidth = Math.max(data.timeline.length * 50, MIN_TOTAL_WIDTH);
+
+    data.timeline.forEach(event=>{
+        const box = document.createElement('div');
+        box.className = 'event-box';
+        const boxWidth = (event.durationSeconds / totalDuration) * timelineTotalWidth;
+        box.style.width = boxWidth + "px";
+        box.style.background = getColor(event.event_type, event.payload);
+        box.title = `Event: ${event.event_type}\nDuration: ${Math.round(event.durationSeconds)} sec\nTime: ${new Date(event.time_stamp).toLocaleTimeString()}\nPayload: ${JSON.stringify(event.payload||{})}`;
+        box.innerText = ""; // <-- remove text inside timeline boxes
+        timelineDiv.appendChild(box);
+    });
+
+    const grouped = {};
+    Object.keys(colorMap).forEach(key=>{
+        const [type, payloadStr] = key.split(/-(.+)/);
+        if(!grouped[type]) grouped[type]=[];
+        grouped[type].push({key, payloadStr, color: colorMap[key]});
+    });
+
+    Object.keys(grouped).forEach(type=>{
+        const column = document.createElement('div');
+        column.className='legend-column';
+        const title = document.createElement('div');
+        title.className='legend-title';
+        title.innerText = type;
+        column.appendChild(title);
+
+        grouped[type].forEach(item=>{
+            const itemDiv = document.createElement('div');
+            itemDiv.className='legend-item';
+            const colorBox = document.createElement('div');
+            colorBox.className='legend-color';
+            colorBox.style.background = item.color;
+            const label = document.createElement('span');
+            label.innerText = item.payloadStr==='null' ? "No payload" : item.payloadStr;
+            itemDiv.appendChild(colorBox);
+            itemDiv.appendChild(label);
+            column.appendChild(itemDiv);
+        });
+
+        timelineLegend.appendChild(column);
+    });
+
+    timelineContainer.scrollIntoView({behavior:'smooth'});
+}
 
 </script>
 </body>

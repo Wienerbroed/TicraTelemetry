@@ -229,19 +229,17 @@ const sessionFetchByQueries = async ({ eventType, startTime, endTime, user_name,
 };
 
 
-const sessionTimeline = async ({ sessionId, startTime, endTime } = {}) => {
+const sessionTimeline = async ({ sessionId } = {}) => {
   if (!sessionId) throw new Error("Session id required");
-  if (!startTime || !endTime) throw new Error("startTime and endTime are required");
-
-  const rangeStart = new Date(startTime);
-  const rangeEnd = new Date(endTime);
 
   const events = await dbCollection
-    .find({ session_id: sessionId, ...timeIntervalFilter(startTime, endTime) })
+    .find({ session_id: sessionId })
     .sort({ event_number: 1 })
     .toArray();
 
-  if (!events.length) return { sessionId, totalEvents: 0, timeline: [] };
+  if (!events.length) {
+    return { sessionId, totalEvents: 0, timeline: [] };
+  }
 
   let totalDurationSeconds = 0;
 
@@ -250,14 +248,18 @@ const sessionTimeline = async ({ sessionId, startTime, endTime } = {}) => {
 
     let durationSeconds = 0;
     if (next) {
-      durationSeconds = (new Date(next.time_stamp) - new Date(current.time_stamp)) / 1000;
+      durationSeconds =
+        (new Date(next.time_stamp) - new Date(current.time_stamp)) / 1000;
       totalDurationSeconds += durationSeconds;
     }
 
     let lastPayload = null;
     if (current.payload && typeof current.payload === "object") {
       const keys = Object.keys(current.payload);
-      if (keys.length) lastPayload = { [keys[keys.length - 1]]: current.payload[keys[keys.length - 1]] };
+      if (keys.length) {
+        const lastKey = keys[keys.length - 1];
+        lastPayload = { [lastKey]: current.payload[lastKey] };
+      }
     }
 
     return {
@@ -279,5 +281,6 @@ const sessionTimeline = async ({ sessionId, startTime, endTime } = {}) => {
     timeline
   };
 };
+
 
 export { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline };

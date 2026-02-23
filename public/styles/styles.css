@@ -52,7 +52,7 @@ footer {
 }
 
 .navbar a:hover {
-  background-color: blue;
+  background-color: rgb(104, 104, 201);
   color: white;
 }
 
