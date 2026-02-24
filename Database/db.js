@@ -41,6 +41,31 @@ const connectDB = async () => {
   }
 };
 
+const connectConfigDB = async () => {
+  if (db) {
+    return db;
+  }
+
+  try {
+    // Set client to database
+    client = new MongoClient(uri);
+
+    // Check connction
+    await client.connect();
+
+    // Sets db
+    db = client.db('config');
+    console.log('MongoDB Atlas connected');
+
+    return db;
+
+  } catch (err) {
+    console.error('MongoDB connection failed:', err.message);
+    process.exit(1);
+  }
+};
+
+
 
 
 const timeIntervalFilter = (start, end) => {

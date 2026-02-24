@@ -9,25 +9,25 @@
 </head>
 <body>
 
-    <header>
-        <div class="navbar">
-            <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
-            <a href="data.html"> Event DataPool </a>
-            <a href="session.html"> Sessions </a>
-        </div>
-    </header>
+<header>
+    <div class="navbar">
+        <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
+        <a href="data.html"> Event DataPool </a>
+        <a href="session.html"> Sessions </a>
+    </div>
+</header>
 
 <h1>Event Pool Viewer</h1>
 
 <div id="filters">
     <div>
+        <strong style="display: block; margin-bottom: 8px;">Date interval:</strong>
         <label>Start date:
             <input type="date" id="startDate">
         </label>
         <label>End date:
             <input type="date" id="endDate">
         </label>
-        <button id="applyButton">Apply</button>
     </div>
 
     <div>
@@ -38,6 +38,10 @@
     <div>
         <strong>Employee types:</strong>
         <div id="employeeTypeGroup" class="checkbox-group"></div>
+    </div>
+
+    <div>
+        <button id="applyButton">Apply</button>
     </div>
 </div>
 
@@ -181,76 +185,6 @@ function getSelections(perUser) {
 }
 
 // ------------------------
-// DRAW BIG TABLE
-// ------------------------
-function drawTable(perUser,selections){
-    const table = document.getElementById('bigTable');
-    const thead = table.querySelector('thead');
-    const tbody = table.querySelector('tbody');
-    thead.innerHTML='';
-    tbody.innerHTML='';
-
-    // CREATE HEADER
-    const headerRow = document.createElement('tr');
-    ['Operation','MOST USED','AVERAGE','TOTAL',...STATE.userOrder].forEach(text=>{
-        const th = document.createElement('th');
-        th.classList.add('rotate','sticky');
-        const div = document.createElement('div');
-        div.textContent=text;
-        th.appendChild(div);
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-
-    // POPULATE BODY
-    STATE.eventTypeOrder.forEach((eventType, idx)=>{
-        const eventSelections = selections.filter(s=>s.startsWith(eventType+'::'));
-        const rowClass = idx%2===0?'eventtype-row-white':'eventtype-row-gray';
-
-        const columnMax = {};
-        STATE.userOrder.forEach(u=>{
-            columnMax[u]=Math.max(...eventSelections.map(sel=>perUser[u]?.[sel]??0),0);
-        });
-
-        eventSelections.forEach(sel=>{
-            const tr = document.createElement('tr');
-            tr.classList.add('sortable',rowClass);
-            const displayName = sel.split('::')[1];
-            tr.dataset.operation = displayName;
-
-            tr.appendChild(createCell(displayName,false,null,'operation-cell'));
-
-            const total = STATE.userOrder.reduce((sum,u)=>sum+(perUser[u]?.[sel]??0),0);
-            const avg = STATE.userOrder.length ? (total/STATE.userOrder.length).toFixed(2) : 0;
-
-            let mostUsed = 0;
-            STATE.userOrder.forEach(u=>{
-                if((perUser[u]?.[sel]??0)===columnMax[u] && columnMax[u]>0) mostUsed++;
-            });
-
-            tr.appendChild(createCell(mostUsed,false,null,'summary-cell'));
-            tr.appendChild(createCell(avg,false,null,'summary-cell'));
-            tr.appendChild(createCell(total,false,null,'summary-cell'));
-
-            STATE.userOrder.forEach(u=>{
-                const val = perUser[u]?.[sel]??0;
-                const td = createCell(val,false,null,'user-cell');
-                if(val>0 && val===columnMax[u]) td.classList.add('heatmap-max');
-                tr.appendChild(td);
-            });
-
-            tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,4));
-            tbody.appendChild(tr);
-        });
-    });
-
-    applyStickyColumns(table,4);
-
-    // SHOW DOWNLOAD BUTTON ONLY IF DATA EXISTS
-    toggleDownloadButton(tbody.children.length > 0);
-}
-
-// ------------------------
 // CSV DOWNLOAD FUNCTION
 // ------------------------
 function downloadBigTableAsCSV() {
@@ -259,14 +193,12 @@ function downloadBigTableAsCSV() {
 
     const rows = [];
 
-    // HEADER
     table.querySelectorAll('thead tr').forEach(tr => {
         const cells = Array.from(tr.querySelectorAll('th'));
         const rowData = cells.map(cell => cell.innerText.trim().replace(/[\r\n\t]+/g,' '));
         rows.push(rowData.join(';'));
     });
 
-    // BODY
     table.querySelectorAll('tbody tr').forEach(tr => {
         const cells = Array.from(tr.querySelectorAll('td'));
         const rowData = cells.map(cell => cell.innerText.trim().replace(/[\r\n\t]+/g,' '));
@@ -287,24 +219,122 @@ function downloadBigTableAsCSV() {
 }
 
 // ------------------------
-// ADD DOWNLOAD BUTTON
+// ADD DOWNLOAD BUTTON (ICON VERSION)
 // ------------------------
-const downloadBtn = document.createElement('button');
-downloadBtn.textContent = 'Download CSV';
-downloadBtn.style.margin = '20px auto';  // center horizontally
-downloadBtn.style.padding = '2px 2px';
-downloadBtn.style.fontSize = '16px';
+const downloadBtn = document.createElement('span');
+downloadBtn.innerHTML = '⬇';
+downloadBtn.title = 'Download CSV';
+downloadBtn.style.position = 'absolute';
+downloadBtn.style.top = '4px';
+downloadBtn.style.left = '6px';
+downloadBtn.style.fontSize = '12px';
 downloadBtn.style.cursor = 'pointer';
-downloadBtn.style.display = 'none';      // initially hidden
-downloadBtn.addEventListener('click', downloadBigTableAsCSV);
+downloadBtn.style.opacity = '0.6';
+downloadBtn.style.display = 'none';
 
-// Add below table wrapper
-document.getElementById('tableContainerWrapper').append(downloadBtn);
+downloadBtn.addEventListener('mouseenter', () => downloadBtn.style.opacity = '1');
+downloadBtn.addEventListener('mouseleave', () => downloadBtn.style.opacity = '0.6');
+downloadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    downloadBigTableAsCSV();
+});
 
-// Function to toggle button visibility
 function toggleDownloadButton(show){
-    downloadBtn.style.display = show ? 'block' : 'none';  // must be valid CSS value
+    downloadBtn.style.display = show ? 'block' : 'none';
 }
+
+// ------------------------
+// DRAW BIG TABLE
+// ------------------------
+function drawTable(perUser, selections){
+    const table = document.getElementById('bigTable');
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+
+    // --- HEADER ROW ---
+    const headerRow = document.createElement('tr');
+    ['Operation','MOST USED','AVERAGE','TOTAL',...STATE.userOrder].forEach((text,index)=>{
+        const th = document.createElement('th');
+        th.classList.add('rotate','sticky');
+        if(index===0) th.style.position='relative';
+        const div = document.createElement('div');
+        div.textContent = text;
+        th.appendChild(div);
+        if(index===0) th.appendChild(downloadBtn);
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+
+    // --- BODY ROWS ---
+    STATE.eventTypeOrder.forEach((eventType, idx)=>{
+        const eventSelections = selections.filter(s=>s.startsWith(eventType+'::'));
+        const rowClass = idx % 2 === 0 ? 'eventtype-row-white' : 'eventtype-row-gray';
+
+        // Compute column-wise max & second-highest per event type
+        const columnMax = {};
+        const columnSecond = {};
+
+        STATE.userOrder.forEach(u=>{
+            const vals = eventSelections.map(sel => perUser[u]?.[sel] ?? 0);
+            const maxVal = Math.max(...vals);
+            let secondVal = vals.filter(v => v < maxVal).reduce((prev,curr)=>Math.max(prev,curr),0);
+            if(secondVal < maxVal/2) secondVal = 0;
+            columnMax[u] = maxVal;
+            columnSecond[u] = secondVal;
+        });
+
+        // Build rows for each selection
+        eventSelections.forEach(sel=>{
+            const tr = document.createElement('tr');
+            tr.classList.add('sortable', rowClass);
+            const displayName = sel.split('::')[1];
+            tr.dataset.operation = displayName;
+
+            // Operation cell
+            tr.appendChild(createCell(displayName, false, null, 'operation-cell'));
+
+            // Summary cells
+            const total = STATE.userOrder.reduce((sum,u)=>sum + (perUser[u]?.[sel] ?? 0),0);
+            const avg = STATE.userOrder.length ? (total / STATE.userOrder.length).toFixed(2) : 0;
+
+            let mostUsed = 0;
+            STATE.userOrder.forEach(u=>{
+                if((perUser[u]?.[sel] ?? 0) === columnMax[u] && columnMax[u] > 0) mostUsed++;
+            });
+
+            tr.appendChild(createCell(mostUsed,false,null,'summary-cell'));
+            tr.appendChild(createCell(avg,false,null,'summary-cell'));
+            tr.appendChild(createCell(total,false,null,'summary-cell'));
+
+            // User cells
+            STATE.userOrder.forEach(u=>{
+                const val = perUser[u]?.[sel] ?? 0;
+                const td = createCell(val,false,null,'user-cell');
+
+                // Apply heatmap per column for this event type
+                if(val === columnMax[u] && columnMax[u] > 0) td.classList.add('heatmap-max');
+                else if(val === columnSecond[u] && columnSecond[u] > 0) td.classList.add('heatmap-second');
+
+                tr.appendChild(td);
+            });
+
+            // Row sorting
+            tr.addEventListener('click', ()=>sortTableByRow(table,tr,STATE.rowSortStates,4));
+            tbody.appendChild(tr);
+        });
+    });
+
+    // --- Apply sticky columns ---
+    applyStickyColumns(table, 4);
+
+    // --- Toggle download button ---
+    toggleDownloadButton(tbody.children.length > 0);
+}
+
+
+
 
 // ------------------------
 // RENDER TABLE + CHARTS
@@ -325,11 +355,8 @@ function renderTableAndCharts(){
 }
 
 // ------------------------
-// INITIAL LOAD
-// ------------------------
 loadEventTypes();
 loadEmployeeTypes();
-
 </script>
 
 </body>

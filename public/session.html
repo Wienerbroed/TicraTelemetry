@@ -7,31 +7,30 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
 <style>
-/* Timeline-specific styling only */
 .timeline-wrapper {
     margin-top: 20px;
-    width: 100%;           /* Full width of container */
-    max-width: 1200px;     /* Max width of timeline visible */
-    overflow-x: auto;      /* Scroll if content overflows */
+    width: 100%;          
+    max-width: 1200px;    
+    overflow-x: auto;    
     border-top: 3px solid #ccc;
     padding-top: 20px;
-    position: relative;    /* Ensure timeline stays in bounds */
+    position: relative;  
 }
 .timeline {
     display: flex;
     align-items: flex-start;
     height: 80px;
-    min-width: 1200px;  /* ensures timeline boxes maintain minimum width */
-    width: max-content;  /* width grows with content but respects wrapper scroll */
+    min-width: 1200px; 
+    width: max-content;  
 }
 .event-box { display:flex; align-items:center; justify-content:center; height:60px; color:white; font-size:12px; border-radius:6px; margin-right:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.2s;}
 .event-box:hover { opacity:0.85; }
-/* Timeline summary top text */
+
 #timelineSummary {
     text-align: center;
     margin-bottom: 15px;
 }
-/* Timeline legend bottom text */
+
 #timelineLegend {
     display: flex;
     justify-content: center;
@@ -58,22 +57,30 @@
     
 <h1>Session Viewer</h1>
 
-<form id="sessionForm">
-  <label>Event Type:
+<form id="filters">
+
+    <div>
+    <strong style="display: block; margin-bottom: 8 px;"> Time Interval:</strong>
+    <label>Start Time:
+        <input type="datetime-local" id="startTime">
+    </label>
+
+    <label>End Time:
+        <input type="datetime-local" id="endTime">
+    </label>
+  </div>
+  <div>
+      <label><strong style="display: block; margin-bottom: 8 px;">Event Type:</strong>
     <select id="eventTypeSelect"><option value="">Select Event Type</option></select>
   </label>
+  </div>
 
-  <label>Employee / Employee Type:
+  <div>
+      <label><strong style="display: block; margin-bottom: 8 px;">Employee / Employee Type:</strong>
     <select id="employeeSelect"><option value="">All</option></select>
   </label>
+  </div>
 
-  <label>Start Time:
-    <input type="datetime-local" id="startTime">
-  </label>
-
-  <label>End Time:
-    <input type="datetime-local" id="endTime">
-  </label>
 
   <button type="submit" id="applyButton">Apply</button>
 </form>
@@ -95,7 +102,7 @@
   ">Download CSV</button>
 </div>
 
-<!-- Timeline container (hidden by default) -->
+
 <div id="timelineContainer" style="display:none; margin:20px 0;">
   <h3>Session Timeline</h3>
   <div id="timelineSummary"></div>
@@ -256,7 +263,8 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
     const table = document.getElementById('bigTable');
     const thead = table.querySelector('thead');
     const tbody = table.querySelector('tbody');
-    thead.innerHTML=''; tbody.innerHTML='';
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
 
     let columns = [];
     if(selectedEmployee && !isType){
@@ -265,14 +273,18 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
         columns = STATE.userOrder;
     }
 
+    // --- HEADER ROW ---
     const headerRow = document.createElement('tr');
     ['Operation','AVERAGE','TOTAL',...columns].forEach((text, idx)=>{
         const th = document.createElement('th');
         th.classList.add('rotate','sticky');
-        const div = document.createElement('div');
-        div.textContent=text;
 
-        // Make session ID headers clickable only for individual employee view
+        if(idx === 0) th.style.position = 'relative';
+
+        const div = document.createElement('div');
+        div.textContent = text;
+
+        // Make session ID headers clickable for individual employee
         if(selectedEmployee && !isType && idx >= 3){ 
             div.style.cursor = "pointer";
             div.style.textDecoration = "underline";
@@ -280,17 +292,61 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
         }
 
         th.appendChild(div);
+
+        // --- Assign user-cell class only to per-user/session columns ---
+        if(idx >= 3){
+            th.classList.add('user-cell');
+        }
+
+        // --- Small download icon in top-left of first cell ---
+        if(idx === 0){
+            const downloadIcon = document.createElement('span');
+            downloadIcon.innerHTML = '⬇';
+            downloadIcon.title = 'Download CSV';
+            downloadIcon.style.position = 'absolute';
+            downloadIcon.style.top = '4px';
+            downloadIcon.style.left = '6px';
+            downloadIcon.style.fontSize = '12px';
+            downloadIcon.style.cursor = 'pointer';
+            downloadIcon.style.opacity = '0.6';
+            downloadIcon.addEventListener('mouseenter', ()=> downloadIcon.style.opacity = '1');
+            downloadIcon.addEventListener('mouseleave', ()=> downloadIcon.style.opacity = '0.6');
+
+            downloadIcon.addEventListener('click', ()=>{
+                const rows = [];
+                table.querySelectorAll('thead tr, tbody tr').forEach(tr=>{
+                    const cells = Array.from(tr.querySelectorAll('th,td'));
+                    rows.push(cells.map(c=>c.innerText.trim().replace(/[\r\n\t]+/g,' ')).join(';'));
+                });
+                const csvContent = '\uFEFF' + rows.join('\r\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'session_data.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+
+            th.appendChild(downloadIcon);
+        }
+
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
 
+    // --- BODY ROWS ---
     tabs.forEach((tab, idx)=>{
         const tr = document.createElement('tr');
         tr.dataset.tab = tab;
-        tr.classList.add(idx%2===0?'eventtype-row-white':'eventtype-row-gray', 'sortable');
+        tr.classList.add(idx % 2 === 0 ? 'eventtype-row-white' : 'eventtype-row-gray', 'sortable');
 
+        // Operation cell
         tr.appendChild(createCell(tab,false,null,'operation-cell'));
 
+        // Compute totals per column
         let totalsArray = [];
         if(selectedEmployee && !isType){
             totalsArray = columns.map(sid=>{
@@ -306,23 +362,31 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
 
         const total = totalsArray.reduce((a,b)=>a+b,0);
         const avg = totalsArray.length ? total/totalsArray.length : 0;
-        tr.appendChild(createCell(formatSecondsToHMS(avg),false,null,'summary-cell'));
-        tr.appendChild(createCell(formatSecondsToHMS(total),false,null,'summary-cell'));
 
+        // Append AVERAGE and TOTAL cells (uncolored)
+        tr.appendChild(createCell(formatSecondsToHMS(avg), false, null,'summary-cell'));
+        tr.appendChild(createCell(formatSecondsToHMS(total), false, null,'summary-cell'));
+
+        // Append user/session cells (colored via heatmap)
         totalsArray.forEach(val=>{
-            const td = createCell(formatSecondsToHMS(val),false,null,'user-cell');
+            const td = createCell(formatSecondsToHMS(val), false, null,'user-cell');
             td.dataset.sort = val;
             tr.appendChild(td);
         });
 
-        tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,3));
+        // Row sorting
+        tr.addEventListener('click', ()=> sortTableByRow(table, tr, STATE.rowSortStates, 3));
         tbody.appendChild(tr);
     });
 
-    applyStickyColumns(table,3);
-    applyColumnHeatmap(table,3);
-    toggleDownloadButton(tbody.children.length>0);
+    // --- Apply sticky columns & heatmap ---
+    applyStickyColumns(table, 3);
+    applyColumnHeatmap(table);
 }
+
+
+
+
 
 // ------------------------
 // DRAW CHARTS

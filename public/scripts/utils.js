@@ -288,6 +288,8 @@ export function applyColumnHeatmap(table){
 
     const headerCells = table.querySelectorAll('thead th');
     let firstUserColIndex = 0;
+
+    // Find first user column
     for (let i = 0; i < headerCells.length; i++) {
         if (headerCells[i].classList.contains('user-cell')) {
             firstUserColIndex = i;
@@ -295,16 +297,40 @@ export function applyColumnHeatmap(table){
         }
     }
 
+    // Loop through each user column
     for (let col = firstUserColIndex; col < headerCells.length; col++) {
-        const values = rows.map(r => parseFloat(r.children[col].dataset.sort)||0);
-        const maxVal = Math.max(...values);
-        rows.forEach(r=>{
+        // Compute columnMax and columnSecondMax based on dataset.sort if present
+        const columnValues = rows.map(r => {
             const td = r.children[col];
-            td.classList.remove('heatmap-max');
-            if(td.dataset.sort && parseFloat(td.dataset.sort)===maxVal && maxVal>0) td.classList.add('heatmap-max');
+            return parseFloat(td.dataset.sort ?? td.textContent) || 0;
+        });
+
+        const maxVal = Math.max(...columnValues);
+        let secondVal = columnValues
+            .filter(v => v < maxVal)
+            .reduce((prev, curr) => Math.max(prev, curr), 0);
+
+        // Apply threshold: second highest only if >= 50% of max
+        if (secondVal < maxVal / 2) secondVal = 0;
+
+        rows.forEach(r => {
+            const td = r.children[col];
+            const val = parseFloat(td.dataset.sort ?? td.textContent) || 0;
+
+            td.classList.remove('heatmap-max','heatmap-second');
+
+            if (val === maxVal && maxVal > 0) {
+                td.classList.add('heatmap-max'); // dark green
+            } else if (val === secondVal && secondVal > 0) {
+                td.classList.add('heatmap-second'); // light green
+            }
         });
     }
 }
+
+
+
+
 
 export function attachSortableRows(table, sortState){
     const headerCells = table.querySelectorAll('thead th');

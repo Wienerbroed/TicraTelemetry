@@ -222,6 +222,11 @@ td.heatmap-max {
   font-weight: bold;
 }
 
+td.heatmap-second {
+  background-color: #89c98b !important;
+  color: white;
+  font-weight: bold;
+}
 
 /* =========================
    ROW HOVER EFFECT
@@ -256,4 +261,41 @@ tr.sortable:hover td:not(.sticky) {
 #multiChartContainer canvas {
   width: 100% !important;
   height: 300px !important;
+}
+#filters {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; 
+    gap: 16px;
+}
+
+.filter-block {
+    width: 100%;               
+}
+
+#applyButton {
+    margin-top: 10px;
+}
+
+#applyButton {
+    align-self: flex-start; 
+    margin-top: 10px;
+}
+
+th {
+    position: relative;
+}
+
+.download-icon {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.download-icon:hover {
+    opacity: 1;
+    transform: scale(1.1);
 }
