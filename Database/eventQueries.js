@@ -1,25 +1,20 @@
-import { readFile } from "fs/promises";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { connectConfigDB } from "./db.js";
 
-// setup for json import
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const configPath = join(__dirname, "./config/queries.json");
+const COLLECTION = "config";
 
-
-
-
-
-// Functions
 const getEventQueries = async () => {
-  const data = await readFile(configPath, "utf-8");
+  const db = await connectConfigDB();
+  const collection = db.collection(COLLECTION);
 
-  const config = JSON.parse(data);
+  // Fetch only configs where mode = "event"
+  const configs = await collection
+    .find(
+      { mode: "event" },
+      { projection: { _id: 0, title: 1 } }
+    )
+    .toArray();
 
-  // Return config keys, not DB values
-  return Object.keys(config);
+  return configs.map(config => config.title);
 };
-
 
 export { getEventQueries };

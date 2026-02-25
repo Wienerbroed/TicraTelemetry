@@ -3,13 +3,15 @@ import { MongoClient } from 'mongodb';
 
 // Enviromental variables
 const username = encodeURIComponent(process.env.MONGO_USER);
+const writeUsername = encodeURIComponent(process.env.MONGO_WRITE_USER)
 const password = encodeURIComponent(process.env.MONGO_PASSWORD);
+const writePassword = encodeURIComponent(process.env.MONGO_WRITE_PASSWORD)
 const dbUrl = encodeURIComponent(process.env.MONGODB_URL);
 
 
 // Database URL
 const uri = `mongodb+srv://${username}:${password}@${dbUrl}/?retryWrites=true&w=majority`;
-
+const writeUrl = `mongodb+srv://${writeUsername}:${writePassword}@${dbUrl}/?retryWrites=true&w=majority`;
 
 // Attributes
 let client;
@@ -48,13 +50,13 @@ const connectConfigDB = async () => {
 
   try {
     // Set client to database
-    client = new MongoClient(uri);
+    client = new MongoClient(writeUrl);
 
     // Check connction
     await client.connect();
 
     // Sets db
-    db = client.db('config');
+    db = client.db('gui_event_db');
     console.log('MongoDB Atlas connected');
 
     return db;
@@ -64,8 +66,6 @@ const connectConfigDB = async () => {
     process.exit(1);
   }
 };
-
-
 
 
 const timeIntervalFilter = (start, end) => {
@@ -92,4 +92,4 @@ const employeeTypeFilter = employeeType => {
 
 
 
-export { connectDB, timeIntervalFilter, employeeTypeFilter };
+export { connectDB, timeIntervalFilter, employeeTypeFilter, connectConfigDB };

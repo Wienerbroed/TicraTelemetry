@@ -1,39 +1,30 @@
 import 'dotenv/config';
 import express from 'express';
+import multer from 'multer';
+import { fileURLToPath } from "url";
+import path from "path";
 import { connectDB } from './database/db.js';
 import { getEventType } from './database/eventTypes.js';
 import { getSessionType } from './database/session.js';
 import { getUsers, getEmployeeTypes } from './database/user.js';
 import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from './database/datapool.js';
-import { appendJson, deleteJson, updateJson } from './database/config/configManager.js';
+import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from './Database/configManager.js';
 import { getEventQueries } from './database/eventQueries.js';
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs/promises";
 
-//////////////////////////////////////////////// App setup ////////////////////////////////////////////////
 const app = express();
 
+// Multer setup for memory storage (store files in memory, not disk)
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Middleware to parse JSON bodies
+// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-
 app.use(express.static('public'));
-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
-const jsonFiles = {
-  queries: "database/config/queries.json",
-  sessions: "database/config/sessions.json"
-};
-
-
-// Connect to DB and start server
+// Connect to DB
 (async () => {
   await connectDB();
   const PORT = process.env.PORT || 3000;
@@ -42,172 +33,128 @@ const jsonFiles = {
   });
 })();
 
-//////////////////////////////////////////////// Routing ////////////////////////////////////////////////
-app.get('/', (req, res) => {
-  res.send('Hello World!');
-});
+// =================== ROUTES ===================
 
+// Home
+app.get('/', (req, res) => res.send('Hello World!'));
 
+// Event types
 app.get('/event', async (req, res) => {
-  try {
-    const data = await getEventType();
-    res.json(data);
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
+  try { res.json(await getEventType()); } 
+  catch { res.status(500).send('Error fetching data'); }
 });
 
-
+// Event queries
 app.get('/eventQueries', async (req, res) => {
-  try {
-    const data = await getEventQueries();
-    res.json(data);
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
+  try { res.json(await getEventQueries()); } 
+  catch { res.status(500).send('Error fetching data'); }
 });
 
-
+// Session types
 app.get('/sessionTypes', async (req, res) => {
-  try {
-    const data = await getSessionType();
-    res.json(data);
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
+  try { res.json(await getSessionType()); } 
+  catch { res.status(500).send('Error fetching data'); }
 });
 
-
+// Users
 app.get('/users', async (req, res) => {
-  try {
-    const data = await getUsers();
-    res.json(data);
-  } catch {
-    res.status(500).send('Error fetching data');
-  }
+  try { res.json(await getUsers()); } 
+  catch { res.status(500).send('Error fetching data'); }
 });
 
-
+// Employee types
 app.get("/employeeTypes", async (req, res) => {
-  try {
-    const types = await getEmployeeTypes();
-    res.json(types);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  try { res.json(await getEmployeeTypes()); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-
-
+// Data pool
 app.get("/data", async (req, res) => {
   try {
     const { startTime, endTime, employeeType, inputEventType } = req.query;
     const data = await fetchDataPoolByQueries({ startTime, endTime, employeeType, inputEventType });
     res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
+// Sessions
 app.get("/session", async (req, res) => {
   try {
     const { startTime, endTime, user_name, eventType, employee_type } = req.query;
-    if (!eventType) {
-      return res.status(400).json({ error: "eventType query parameter is required" });
-    }
-
+    if (!eventType) return res.status(400).json({ error: "eventType query parameter is required" });
     const data = await sessionFetchByQueries({ eventType, startTime, endTime, user_name, employee_type });
-
     res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-
+// Session timeline
 app.get("/sessionTimeline", async (req, res) => {
   try {
     const { sessionId } = req.query;
-
-    if (!sessionId) {
-      return res.status(400).json({ error: "sessionId query parameter is required" });
-    }
-
+    if (!sessionId) return res.status(400).json({ error: "sessionId query parameter is required" });
     const data = await sessionTimeline({ sessionId });
     res.json(data);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// =================== CONFIG MANAGER ===================
 
-
-/////////////////////////////// Config Manager Endpoints ////////////////////////////////////
-app.get("/api/config-files", (req, res) => {
-  res.json(Object.keys(jsonFiles));
+// List all configs
+app.get("/api/configs", async (req, res) => {
+  try { res.json(await listConfigs()); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-
-app.get("/api/:fileKey/queries", async (req, res) => {
+// Get raw config
+app.get("/api/configs/:title", async (req, res) => {
   try {
-    const { fileKey } = req.params;
-    if (!jsonFiles[fileKey]) return res.status(400).json({ error: "Invalid file key" });
-
-    const data = await fs.readFile(path.join(__dirname, jsonFiles[fileKey]), "utf8");
-    res.json(data.trim() ? JSON.parse(data) : {});
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const config = await getRawConfig(req.params.title);
+    if (!config) return res.status(404).json({ error: "Config not found" });
+    res.json(config);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Get query from config
+app.get("/api/configs/:title/query", async (req, res) => {
+  try { res.json(await getConfigQuery(req.params.title)); } 
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
 
-app.post("/api/:fileKey/queries", async (req, res) => {
-  const { fileKey } = req.params;
-  const { title, eventType, payloadPath } = req.body;
-
-  if (!title || !eventType || !payloadPath) {
-    return res.status(400).json({ error: "title, eventType, and payloadPath are required" });
-  }
-
+// Create config (with optional image & description)
+app.post("/api/configs", upload.single('image'), async (req, res) => {
   try {
-    await appendJson(fileKey, title, eventType, payloadPath);
-    res.json({ message: "Query added successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const { title, mode, event_type, payload_field, description } = req.body;
+    const extra_query = {};
+
+    if (req.file) {
+      extra_query.image = { data: req.file.buffer.toString('base64'), contentType: req.file.mimetype };
+    }
+
+    const config = await createConfig({ title, mode, event_type, payload_field, description, extra_query });
+    res.json(config);
+  } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-
-app.put("/api/:fileKey/queries/:key", async (req, res) => {
-  const { fileKey, key } = req.params;
-  const { title, eventType, payloadPath } = req.body;
-
-  if (!title || !eventType || !payloadPath) {
-    return res.status(400).json({ error: "title, eventType, and payloadPath are required" });
-  }
-
+// Update config (with optional image & description)
+app.put("/api/configs/:title", upload.single('image'), async (req, res) => {
   try {
-    await updateJson(fileKey, key, title, eventType, payloadPath);
-    res.json({ message: "Query updated successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    const oldTitle = req.params.title;
+    const { title, mode, event_type, payload_field, description } = req.body;
+
+    const updates = { title, mode, event_type, payload_field, description };
+
+    if (req.file) {
+      updates.extra_query = { ...updates.extra_query, image: { data: req.file.buffer.toString('base64'), contentType: req.file.mimetype } };
+    }
+
+    const result = await updateConfig(oldTitle, updates);
+    res.json(result);
+  } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-
-app.delete("/api/:fileKey/queries/:key", async (req, res) => {
-  const { fileKey, key } = req.params;
-  try {
-    await deleteJson(fileKey, key);
-    res.json({ message: "Query deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// Delete config
+app.delete("/api/configs/:title", async (req, res) => {
+  try { res.json(await deleteConfig(req.params.title)); } 
+  catch (err) { res.status(400).json({ error: err.message }); }
 });
+

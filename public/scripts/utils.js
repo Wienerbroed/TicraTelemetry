@@ -154,7 +154,13 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colo
                         x: { ticks: { autoSkip: false } }
                     },
                     layout: { padding: { top: 10, bottom: 5 } },
-                    interaction: { mode: 'index', axis: 'x', intersect: false }
+                    interaction: { mode: 'index', axis: 'x', intersect: false },
+                    
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
                 }
             );
         };

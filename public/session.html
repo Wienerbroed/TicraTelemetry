@@ -7,30 +7,41 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
 <style>
+/* TIMELINE STYLES */
 .timeline-wrapper {
     margin-top: 20px;
-    width: 100%;          
-    max-width: 1200px;    
-    overflow-x: auto;    
+    width: 100%;
+    max-width: 1200px;
+    overflow-x: auto;
     border-top: 3px solid #ccc;
     padding-top: 20px;
-    position: relative;  
+    position: relative;
 }
 .timeline {
     display: flex;
     align-items: flex-start;
     height: 80px;
-    min-width: 1200px; 
-    width: max-content;  
+    min-width: 1200px;
+    width: max-content;
 }
-.event-box { display:flex; align-items:center; justify-content:center; height:60px; color:white; font-size:12px; border-radius:6px; margin-right:2px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity 0.2s;}
+.event-box { 
+    display:flex; 
+    align-items:center; 
+    justify-content:center; 
+    height:60px; 
+    color:white; 
+    font-size:12px; 
+    border-radius:6px; 
+    margin-right:2px; 
+    cursor:pointer; 
+    white-space:nowrap; 
+    overflow:hidden; 
+    text-overflow:ellipsis; 
+    transition:opacity 0.2s;
+}
 .event-box:hover { opacity:0.85; }
 
-#timelineSummary {
-    text-align: center;
-    margin-bottom: 15px;
-}
-
+#timelineSummary { text-align: center; margin-bottom: 15px; }
 #timelineLegend {
     display: flex;
     justify-content: center;
@@ -43,47 +54,78 @@
 .legend-title { font-weight:bold; margin-bottom:6px; }
 .legend-item { display:flex; align-items:center; font-size:13px; }
 .legend-color { width:15px; height:15px; margin-right:6px; border-radius:3px; }
+
+/* DESCRIPTION + IMAGE BLOCKS */
+#descriptionImageContainer {
+    display:grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap:16px;
+    margin:20px 0;
+}
+.description-image-block {
+    border: 1px solid #ccc;
+    padding: 12px;
+    border-radius: 6px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.description-image-block img {
+    max-width: 100%;
+    max-height: 180px;
+    margin-top: 8px;
+    object-fit: contain;
+}
+.description-image-block p {
+    font-size: 0.95rem;
+    margin: 0;
+}
 </style>
 </head>
 <body>
 
-    <header>
-        <div class="navbar">
-            <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
-            <a href="data.html"> Event DataPool </a>
-            <a href="session.html"> Sessions </a>
-        </div>
-    </header>
-    
+<header>
+    <div class="navbar">
+        <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+        <a href="data.html">Event DataPool</a>
+        <a href="session.html">Sessions</a>
+    </div>
+</header>
+
 <h1>Session Viewer</h1>
 
 <form id="filters">
+    <div>
+        <strong style="display:block; margin-bottom:8px;">Time Interval:</strong>
+        <label>Start Time:
+            <input type="datetime-local" id="startTime">
+        </label>
+        <label>End Time:
+            <input type="datetime-local" id="endTime">
+        </label>
+    </div>
 
     <div>
-    <strong style="display: block; margin-bottom: 8 px;"> Time Interval:</strong>
-    <label>Start Time:
-        <input type="datetime-local" id="startTime">
-    </label>
+        <label>
+            <strong style="display:block; margin-bottom:8px;">Event Type:</strong>
+            <select id="eventTypeSelect"><option value="">Select Event Type</option></select>
+        </label>
+    </div>
 
-    <label>End Time:
-        <input type="datetime-local" id="endTime">
-    </label>
-  </div>
-  <div>
-      <label><strong style="display: block; margin-bottom: 8 px;">Event Type:</strong>
-    <select id="eventTypeSelect"><option value="">Select Event Type</option></select>
-  </label>
-  </div>
+    <div>
+        <label>
+            <strong style="display:block; margin-bottom:8px;">Employee / Employee Type:</strong>
+            <select id="employeeSelect"><option value="">All</option></select>
+        </label>
+    </div>
 
-  <div>
-      <label><strong style="display: block; margin-bottom: 8 px;">Employee / Employee Type:</strong>
-    <select id="employeeSelect"><option value="">All</option></select>
-  </label>
-  </div>
-
-
-  <button type="submit" id="applyButton">Apply</button>
+    <button type="submit" id="applyButton">Apply</button>
 </form>
+
+<!-- DESCRIPTION + IMAGE CONTAINER -->
+<div id="descriptionImageContainer"></div>
 
 <div id="tableContainerWrapper">
   <div id="tableContainer">
@@ -101,7 +143,6 @@
       display:none;
   ">Download CSV</button>
 </div>
-
 
 <div id="timelineContainer" style="display:none; margin:20px 0;">
   <h3>Session Timeline</h3>
@@ -125,11 +166,7 @@ import {
 } from './scripts/utils.js';
 
 const STATE = {
-    fullSessions: [],
-    activeUsers: [],
-    userOrder: [],
-    sessionOrder: [],
-    rowSortStates: {}
+    fullSessions: [], activeUsers: [], userOrder: [], sessionOrder: [], rowSortStates: {}
 };
 
 const eventTypeSelect = document.getElementById("eventTypeSelect");
@@ -138,6 +175,7 @@ const startInput = document.getElementById("startTime");
 const endInput = document.getElementById("endTime");
 const applyButton = document.getElementById("applyButton");
 const downloadBtn = document.getElementById("downloadBtn");
+const descriptionImageContainer = document.getElementById('descriptionImageContainer');
 
 const timelineContainer = document.getElementById('timelineContainer');
 const timelineSummary = document.getElementById('timelineSummary');
@@ -194,6 +232,44 @@ async function initDropdowns() {
 initDropdowns();
 
 // ------------------------
+// LOAD DESCRIPTION + IMAGE BOXES
+// ------------------------
+async function loadDescriptionImageBoxes(eventType) {
+    descriptionImageContainer.innerHTML = '';
+    if(!eventType) return;
+
+    try {
+        const configQuery = await fetchJson(`/api/configs/${encodeURIComponent(eventType)}`);
+        const description = configQuery.description ?? '';
+        const imgObj = configQuery.extra_query?.image;
+
+        const block = document.createElement("div");
+        block.classList.add("description-image-block");
+
+        if(description){
+            const descElem = document.createElement("p");
+            descElem.textContent = description;
+            block.appendChild(descElem);
+        }
+
+        if(imgObj?.data){
+            const imgElem = document.createElement("img");
+            imgElem.src = `data:${imgObj.contentType};base64,${imgObj.data}`;
+            block.appendChild(imgElem);
+        }
+
+        descriptionImageContainer.appendChild(block);
+
+        descriptionImageContainer.querySelectorAll('.description-image-block').forEach((b, idx)=>{
+            b.style.background = idx % 2 === 0 ? '#fff' : '#eee';
+        });
+
+    } catch(err){
+        console.warn("No config found for event type:", eventType);
+    }
+}
+
+// ------------------------
 // APPLY BUTTON: FETCH SESSIONS
 // ------------------------
 applyButton.addEventListener('click', async e=>{
@@ -204,6 +280,8 @@ applyButton.addEventListener('click', async e=>{
     const selectedEmployee = employeeSelect.value || null;
     const selectedOption = employeeSelect.querySelector(`option[value="${selectedEmployee}"]`);
     const isType = selectedOption?.dataset.type==='employeeType';
+
+    loadDescriptionImageBoxes(selectedEvent);
 
     const params = new URLSearchParams();
     params.append('eventType', selectedEvent);
@@ -257,7 +335,7 @@ function renderTableAndCharts(selectedEmployee=null, isType=false){
 }
 
 // ------------------------
-// DRAW TABLE
+// DRAW TABLE FUNCTION
 // ------------------------
 function drawTable(perUser, tabs, selectedEmployee, isType){
     const table = document.getElementById('bigTable');
@@ -273,7 +351,7 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
         columns = STATE.userOrder;
     }
 
-    // --- HEADER ROW ---
+    // HEADER
     const headerRow = document.createElement('tr');
     ['Operation','AVERAGE','TOTAL',...columns].forEach((text, idx)=>{
         const th = document.createElement('th');
@@ -284,7 +362,6 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
         const div = document.createElement('div');
         div.textContent = text;
 
-        // Make session ID headers clickable for individual employee
         if(selectedEmployee && !isType && idx >= 3){ 
             div.style.cursor = "pointer";
             div.style.textDecoration = "underline";
@@ -293,12 +370,8 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
 
         th.appendChild(div);
 
-        // --- Assign user-cell class only to per-user/session columns ---
-        if(idx >= 3){
-            th.classList.add('user-cell');
-        }
+        if(idx >= 3) th.classList.add('user-cell');
 
-        // --- Small download icon in top-left of first cell ---
         if(idx === 0){
             const downloadIcon = document.createElement('span');
             downloadIcon.innerHTML = '⬇';
@@ -312,24 +385,7 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
             downloadIcon.addEventListener('mouseenter', ()=> downloadIcon.style.opacity = '1');
             downloadIcon.addEventListener('mouseleave', ()=> downloadIcon.style.opacity = '0.6');
 
-            downloadIcon.addEventListener('click', ()=>{
-                const rows = [];
-                table.querySelectorAll('thead tr, tbody tr').forEach(tr=>{
-                    const cells = Array.from(tr.querySelectorAll('th,td'));
-                    rows.push(cells.map(c=>c.innerText.trim().replace(/[\r\n\t]+/g,' ')).join(';'));
-                });
-                const csvContent = '\uFEFF' + rows.join('\r\n');
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'session_data.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-
+            downloadIcon.addEventListener('click', ()=> downloadTableCSV());
             th.appendChild(downloadIcon);
         }
 
@@ -337,16 +393,14 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
     });
     thead.appendChild(headerRow);
 
-    // --- BODY ROWS ---
+    // BODY ROWS
     tabs.forEach((tab, idx)=>{
         const tr = document.createElement('tr');
         tr.dataset.tab = tab;
         tr.classList.add(idx % 2 === 0 ? 'eventtype-row-white' : 'eventtype-row-gray', 'sortable');
 
-        // Operation cell
         tr.appendChild(createCell(tab,false,null,'operation-cell'));
 
-        // Compute totals per column
         let totalsArray = [];
         if(selectedEmployee && !isType){
             totalsArray = columns.map(sid=>{
@@ -363,30 +417,22 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
         const total = totalsArray.reduce((a,b)=>a+b,0);
         const avg = totalsArray.length ? total/totalsArray.length : 0;
 
-        // Append AVERAGE and TOTAL cells (uncolored)
         tr.appendChild(createCell(formatSecondsToHMS(avg), false, null,'summary-cell'));
         tr.appendChild(createCell(formatSecondsToHMS(total), false, null,'summary-cell'));
 
-        // Append user/session cells (colored via heatmap)
         totalsArray.forEach(val=>{
             const td = createCell(formatSecondsToHMS(val), false, null,'user-cell');
             td.dataset.sort = val;
             tr.appendChild(td);
         });
 
-        // Row sorting
         tr.addEventListener('click', ()=> sortTableByRow(table, tr, STATE.rowSortStates, 3));
         tbody.appendChild(tr);
     });
 
-    // --- Apply sticky columns & heatmap ---
     applyStickyColumns(table, 3);
     applyColumnHeatmap(table);
 }
-
-
-
-
 
 // ------------------------
 // DRAW CHARTS
@@ -442,14 +488,16 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
             }
 
             renderBarChart(canvas, labels, data, COLORS.slice(0, labels.length), {
-                responsive:true,
-                animation:false,
-                maintainAspectRatio:false,
-                scales:{
-                    y:{
-                        beginAtZero:true,
+                responsive: true,
+                animation: false,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false }},
+                scales: {
+                    y: {
+                        beginAtZero: true,
                         max: percentageCheckbox.checked ? 100 : undefined,
-                        title:{display:true,text:percentageCheckbox.checked?'Percentage (%)':'Seconds'}
+                        title: { display: true, text: percentageCheckbox.checked ? 'Percentage (%)' : 'Seconds' }
                     }
                 }
             });
@@ -461,9 +509,9 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
 }
 
 // ------------------------
-// CSV DOWNLOAD
+// DOWNLOAD CSV
 // ------------------------
-downloadBtn.addEventListener('click', ()=>{
+function downloadTableCSV(){
     const table = document.getElementById('bigTable');
     if(!table) return;
 
@@ -475,7 +523,6 @@ downloadBtn.addEventListener('click', ()=>{
     const csvContent = '\uFEFF' + rows.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-
     const a = document.createElement('a');
     a.href = url;
     a.download = 'session_data.csv';
@@ -483,8 +530,8 @@ downloadBtn.addEventListener('click', ()=>{
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-});
-
+}
+downloadBtn.addEventListener('click', downloadTableCSV);
 function toggleDownloadButton(show){ downloadBtn.style.display = show ? 'block' : 'none'; }
 
 // ------------------------
@@ -570,7 +617,6 @@ async function loadTimeline(sessionId){
 
     timelineContainer.scrollIntoView({behavior:'smooth'});
 }
-
 </script>
 </body>
 </html>
