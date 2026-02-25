@@ -8,7 +8,7 @@ import { getEventType } from './database/eventTypes.js';
 import { getSessionType } from './database/session.js';
 import { getUsers, getEmployeeTypes } from './database/user.js';
 import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from './database/datapool.js';
-import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from './Database/configManager.js';
+import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from './database/configManager.js';
 import { getEventQueries } from './database/eventQueries.js';
 
 const app = express();
