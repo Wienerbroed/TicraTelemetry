@@ -3,13 +3,13 @@ import express from 'express';
 import multer from 'multer';
 import { fileURLToPath } from "url";
 import path from "path";
-import { connectDB } from './database/db.js';
-import { getEventType } from './database/eventTypes.js';
-import { getSessionType } from './database/session.js';
-import { getUsers, getEmployeeTypes } from './database/user.js';
-import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from './database/datapool.js';
-import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from './database/configManager.js';
-import { getEventQueries } from './database/eventQueries.js';
+import { connectDB } from './Database/db.js';
+import { getEventType } from './Database/eventTypes.js';
+import { getSessionType } from './Database/session.js';
+import { getUsers, getEmployeeTypes } from './Database/user.js';
+import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from './Database/datapool.js';
+import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from './Database/configManager.js';
+import { getEventQueries } from './Database/eventQueries.js';
 
 const app = express();
 
