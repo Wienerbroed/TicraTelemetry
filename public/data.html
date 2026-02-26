@@ -81,7 +81,7 @@
 <footer>© TICRA foundation</footer>
 
 <script type="module">
-import { COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, renderMultipleBarCharts, applyStickyColumns } from './scripts/utils.js';
+import { COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, renderMultipleBarCharts, applyStickyColumns, downloadTableCSV } from './scripts/utils.js';
 
 const STATE = {
   fullEvents: [],
@@ -133,7 +133,7 @@ function getCheckedValues(containerId){
 // Apply button
 document.getElementById('applyButton').addEventListener('click', async () => {
   const selectedEventTypes = getCheckedValues('eventTypeGroup');
-  if(selectedEventTypes.length===0) return;
+  if (selectedEventTypes.length === 0) return;
 
   const selectedEmployees = getCheckedEmployeeTypes();
   const startDate = document.getElementById('startDate').value;
@@ -145,23 +145,33 @@ document.getElementById('applyButton').addEventListener('click', async () => {
   const boxesContainer = document.getElementById('queryBoxesContainer');
   boxesContainer.innerHTML = '';
 
-  for(const [idx,eventType] of selectedEventTypes.entries()){
+  for (const [idx, eventType] of selectedEventTypes.entries()) {
     const params = new URLSearchParams();
     params.append('inputEventType', eventType);
-    if(startDate) params.append('startTime', startDate+'T00:00:00');
-    if(endDate) params.append('endTime', endDate+'T23:59:59');
-    if(selectedEmployees) selectedEmployees.forEach(emp => params.append('employeeType', emp));
+    if (startDate) params.append('startTime', startDate + 'T00:00:00');
+    if (endDate) params.append('endTime', endDate + 'T23:59:59');
+    if (selectedEmployees) selectedEmployees.forEach(emp => params.append('employeeType', emp));
 
     const url = `/data?${params.toString()}`;
     const data = await fetchJson(url);
 
-    const events = data.events.map(ev=>({
-      eventType,
-      user: ev.user_name??"unknown",
-      selection: String(Object.values(ev.payload)[0]??"unknown"),
-      employee_type: ev.employee_type??"unknown",
-      count: ev.count??0
-    }));
+    // Map events safely
+    const events = (data.events ?? []).map(ev => {
+      let selection = "unknown";
+
+      if (ev.payload && Object.keys(ev.payload).length) {
+        selection = String(Object.values(ev.payload)[0] ?? "unknown");
+      }
+
+      return {
+        eventType,
+        user: ev.user_name ?? "unknown",
+        selection,
+        employee_type: ev.employee_type ?? "unknown",
+        count: ev.count ?? 0
+      };
+    });
+
     STATE.fullEvents.push(...events);
     STATE.eventTypeOrder.push(eventType);
 
@@ -172,18 +182,34 @@ document.getElementById('applyButton').addEventListener('click', async () => {
       const imgObj = configQuery.extra_query?.image;
 
       const block = document.createElement("div");
-      block.classList.add("query-box");
-      block.classList.add(idx%2===1 ? 'grey':'white');
+      block.classList.add("query-box", idx % 2 === 1 ? 'grey' : 'white');
 
-      const header = document.createElement("h3"); header.textContent = eventType; block.appendChild(header);
-      if(description){ const p = document.createElement("p"); p.textContent = description; block.appendChild(p); }
-      if(imgObj?.data){ const img = document.createElement("img"); img.src = `data:${imgObj.contentType};base64,${imgObj.data}`; block.appendChild(img); }
+      const header = document.createElement("h3");
+      header.textContent = eventType;
+      block.appendChild(header);
+
+      if (description) {
+        const p = document.createElement("p");
+        p.textContent = description;
+        block.appendChild(p);
+      }
+
+      if (imgObj?.data) {
+        const img = document.createElement("img");
+        img.src = `data:${imgObj.contentType};base64,${imgObj.data}`;
+        block.appendChild(img);
+      }
 
       boxesContainer.appendChild(block);
-    } catch(err){ console.warn("No config for", eventType); }
+    } catch (err) {
+      console.warn("No config for", eventType);
+    }
   }
 
+  // Remove duplicates
   STATE.eventTypeOrder = [...new Set(STATE.eventTypeOrder)];
+
+  // Render table and charts
   renderTableAndCharts();
 });
 
@@ -202,26 +228,7 @@ function buildPerUser(events){
 }
 function getSelections(perUser){ return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort(); }
 
-// CSV download function
-function downloadBigTableAsCSV() {
-  const table = document.getElementById('bigTable'); if(!table) return;
-  const rows = [];
-  table.querySelectorAll('thead tr').forEach(tr => { 
-    const cells = Array.from(tr.querySelectorAll('th')); 
-    rows.push(cells.map(c=>c.innerText.trim().replace(/[\r\n\t]+/g,' ')).join(';')); 
-  });
-  table.querySelectorAll('tbody tr').forEach(tr => { 
-    const cells = Array.from(tr.querySelectorAll('td')); 
-    rows.push(cells.map(c=>c.innerText.trim().replace(/[\r\n\t]+/g,' ')).join(';')); 
-  });
-  const csvContent = '\uFEFF' + rows.join('\r\n'); 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='event_pool_data.csv'; 
-  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-}
-
-// Table and charts rendering (reuse your previous drawTable, renderTableAndCharts functions)
+// DOWNLOAD BUTTON
 const downloadBtn = document.createElement('span');
 downloadBtn.innerHTML='⬇'; downloadBtn.title='Download CSV';
 downloadBtn.style.position='absolute'; downloadBtn.style.top='4px'; downloadBtn.style.left='6px';
@@ -229,10 +236,10 @@ downloadBtn.style.fontSize='12px'; downloadBtn.style.cursor='pointer'; downloadB
 downloadBtn.style.display='none';
 downloadBtn.addEventListener('mouseenter',()=>downloadBtn.style.opacity='1');
 downloadBtn.addEventListener('mouseleave',()=>downloadBtn.style.opacity='0.6');
-downloadBtn.addEventListener('click',(e)=>{e.stopPropagation(); downloadBigTableAsCSV();});
+downloadBtn.addEventListener('click',(e)=>{e.stopPropagation(); downloadTableCSV();});
 function toggleDownloadButton(show){ downloadBtn.style.display = show?'block':'none'; }
 
-// DRAW TABLE (reuse previous logic)
+// DRAW TABLE (unchanged)
 function drawTable(perUser,selections){
   const table=document.getElementById('bigTable');
   const thead=table.querySelector('thead'); const tbody=table.querySelector('tbody');

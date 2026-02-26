@@ -71,21 +71,58 @@ app.get("/employeeTypes", async (req, res) => {
 // Data pool
 app.get("/data", async (req, res) => {
   try {
-    const { startTime, endTime, employeeType, inputEventType } = req.query;
-    const data = await fetchDataPoolByQueries({ startTime, endTime, employeeType, inputEventType });
+    const { startTime, endTime, employeeType, inputEventType: title } = req.query;
+
+    if (!title) return res.status(400).json({ error: "Config title is required" });
+    if (!startTime || !endTime) return res.status(400).json({ error: "startTime and endTime are required" });
+
+    // Step 1: Look up config by title
+    const config = await getRawConfig(title); // title from frontend
+    if (!config) return res.status(404).json({ error: "Config not found" });
+
+    const actualEventType = config.event_type; // use event_type for querying gui_event
+
+    // Step 2: Fetch events using actual event_type
+    const data = await fetchDataPoolByQueries({ startTime, endTime, employeeType, inputEventType: actualEventType });
+
     res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 // Sessions
 app.get("/session", async (req, res) => {
   try {
-    const { startTime, endTime, user_name, eventType, employee_type } = req.query;
-    if (!eventType) return res.status(400).json({ error: "eventType query parameter is required" });
-    const data = await sessionFetchByQueries({ eventType, startTime, endTime, user_name, employee_type });
+    const { startTime, endTime, user_name, configTitle, employee_type } = req.query;
+
+    if (!configTitle) return res.status(400).json({ error: "configTitle query parameter is required" });
+
+    // ✅ Step 1: Look up config
+    const config = await getRawConfig(configTitle);
+    if (!config) return res.status(404).json({ error: "Config not found" });
+
+    const eventType = config.event_type; // <-- use this for gui_event query
+
+    // ✅ Step 2: Pass eventType to sessionFetchByQueries
+    const data = await sessionFetchByQueries({
+      configTitle,
+      startTime,
+      endTime,
+      user_name,
+      employee_type,
+      inputEventType: eventType  // <-- add this
+    });
+
     res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error(err);
+    res.status(500).json({ error: err.message }); 
+  }
 });
+
 
 // Session timeline
 app.get("/sessionTimeline", async (req, res) => {
@@ -157,4 +194,3 @@ app.delete("/api/configs/:title", async (req, res) => {
   try { res.json(await deleteConfig(req.params.title)); } 
   catch (err) { res.status(400).json({ error: err.message }); }
 });
-

@@ -30,18 +30,6 @@ export async function fetchJson(url) {
     return res.json();
 }
 
-export async function populateDropdown(selectId, url, defaultOption) {
-    const sel = document.getElementById(selectId);
-    sel.innerHTML = '';
-    sel.appendChild(new Option(defaultOption, ''));
-    try {
-        const items = await fetchJson(url);
-        items.forEach(item => sel.appendChild(new Option(item, item)));
-    } catch (err) {
-        console.error(`Failed to load dropdown ${selectId}`, err);
-    }
-}
-
 // ---------------- TABLE CELL HELPERS ----------------
 export function createHeader(text, className=null) {
     const th = document.createElement('th');
@@ -170,8 +158,41 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colo
     });
 }
 
+// ------------------------
+// DOWNLOAD TABLE AS CSV
+// ------------------------
+export function downloadTableCSV(tableId = 'bigTable', filename = 'session_data.csv') {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    const rows = [];
+
+    table.querySelectorAll('thead tr, tbody tr').forEach(tr => {
+        const cells = Array.from(tr.querySelectorAll('th,td'));
+        rows.push(
+            cells
+                .map(c => c.innerText.trim().replace(/[\r\n\t]+/g, ' '))
+                .join(';')
+        );
+    });
+
+    const csvContent = '\uFEFF' + rows.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+
 // ---------------- STICKY COLUMNS ----------------
-export function applyStickyColumns(table, numColumns = 3) {
+export function applyStickyColumns(table, numColumns = 0) {
     if (!table) return;
 
     const wrapper = table.closest('#tableContainerWrapper');
