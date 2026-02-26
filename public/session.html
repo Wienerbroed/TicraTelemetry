@@ -7,7 +7,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
 <style>
-/* TIMELINE STYLES */
 .timeline-wrapper {
     margin-top: 20px;
     width: 100%;
@@ -55,7 +54,6 @@
 .legend-item { display:flex; align-items:center; font-size:13px; }
 .legend-color { width:15px; height:15px; margin-right:6px; border-radius:3px; }
 
-/* DESCRIPTION + IMAGE BLOCKS */
 #descriptionImageContainer {
     display:grid;
     grid-template-columns: repeat(4, 1fr);
@@ -125,7 +123,6 @@
     <button type="submit" id="applyButton">Apply</button>
 </form>
 
-<!-- DESCRIPTION + IMAGE CONTAINER -->
 <div id="descriptionImageContainer"></div>
 
 <div id="tableContainerWrapper">
@@ -136,13 +133,7 @@
     </table>
   </div>
 
-  <button id="downloadBtn" style="
-      margin:20px auto;
-      padding:4px 8px;
-      font-size:14px;
-      cursor:pointer;
-      display:none;
-  ">Download CSV</button>
+  <button id="downloadBtn">Download CSV</button>
 </div>
 
 <div id="timelineContainer" style="display:none; margin:20px 0;">
@@ -163,7 +154,8 @@
 <script type="module">
 import { 
   COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, renderBarChart, 
-  applyStickyColumns, applyColumnHeatmap, formatSecondsToHMS, u_type_matches
+  applyStickyColumns, applyColumnHeatmap, formatSecondsToHMS, u_type_matches,
+  downloadTableCSV
 } from './scripts/utils.js';
 
 const STATE = {
@@ -185,9 +177,6 @@ const timelineLegend = document.getElementById('timelineLegend');
 
 setDefaultDateRange('startTime','endTime',10);
 
-// ------------------------
-// INITIALIZE DROPDOWNS
-// ------------------------
 async function initDropdowns() {
     const eventTypes = await fetchJson('/sessionTypes');
     eventTypeSelect.innerHTML = '<option value="">Select Event Type</option>';
@@ -216,10 +205,9 @@ async function initDropdowns() {
     }
 
     if(users.length){
-        const uniqueUsers = [...new Set(users)];
         const group = document.createElement("optgroup");
         group.label = "Employees";
-        uniqueUsers.forEach(u => {
+        [...new Set(users)].forEach(u => {
             const opt = document.createElement("option");
             opt.value = u;
             opt.textContent = u;
@@ -232,15 +220,12 @@ async function initDropdowns() {
 
 initDropdowns();
 
-// ------------------------
-// LOAD DESCRIPTION + IMAGE BOXES
-// ------------------------
-async function loadDescriptionImageBoxes(eventType) {
+async function loadDescriptionImageBoxes(configTitle) {
     descriptionImageContainer.innerHTML = '';
-    if(!eventType) return;
+    if(!configTitle) return;
 
     try {
-        const configQuery = await fetchJson(`/api/configs/${encodeURIComponent(eventType)}`);
+        const configQuery = await fetchJson(`/api/configs/${encodeURIComponent(configTitle)}`);
         const description = configQuery.description ?? '';
         const imgObj = configQuery.extra_query?.image;
 
@@ -266,41 +251,44 @@ async function loadDescriptionImageBoxes(eventType) {
         });
 
     } catch(err){
-        console.warn("No config found for event type:", eventType);
+        console.warn("No config found for title:", configTitle);
     }
 }
 
-// ------------------------
-// APPLY BUTTON: FETCH SESSIONS
-// ------------------------
 applyButton.addEventListener('click', async e=>{
     e.preventDefault();
-    const selectedEvent = eventTypeSelect.value;
-    if(!selectedEvent) return;
+    const selectedConfig = eventTypeSelect.value;
+    if(!selectedConfig) return;
 
     const selectedEmployee = employeeSelect.value || null;
     const selectedOption = employeeSelect.querySelector(`option[value="${selectedEmployee}"]`);
     const isType = selectedOption?.dataset.type==='employeeType';
 
-    loadDescriptionImageBoxes(selectedEvent);
+    await loadDescriptionImageBoxes(selectedConfig);
+
+    let startTime = startInput.value || new Date(Date.now()-30*24*60*60*1000).toISOString();
+    let endTime = endInput.value || new Date().toISOString();
 
     const params = new URLSearchParams();
-    params.append('eventType', selectedEvent);
-    if(startInput.value) params.append('startTime', startInput.value);
-    if(endInput.value) params.append('endTime', endInput.value);
-    if(isType) params.append('employee_type', selectedEmployee);
+    params.append('configTitle', selectedConfig);
+    params.append('startTime', startTime);
+    params.append('endTime', endTime);
+    if(isType && selectedEmployee) params.append('employee_type', selectedEmployee);
     else if(selectedEmployee) params.append('user_name', selectedEmployee);
 
     const url = `/session?${params.toString()}`;
-    const data = await fetchJson(url);
-    STATE.fullSessions = data.sessions || [];
-
-    renderTableAndCharts(selectedEmployee, isType);
+    try {
+        const data = await fetchJson(url);
+        STATE.fullSessions = data.sessions || [];
+        renderTableAndCharts(selectedEmployee, isType);
+    } catch(err){
+        console.error("Error fetching sessions:", err);
+        alert("Failed to load sessions. See console for details.");
+        STATE.fullSessions = [];
+        renderTableAndCharts();
+    }
 });
 
-// ------------------------
-// RENDER TABLE + CHARTS
-// ------------------------
 function renderTableAndCharts(selectedEmployee=null, isType=false){
     const sessions = STATE.fullSessions;
     const table = document.getElementById('bigTable');
@@ -335,9 +323,6 @@ function renderTableAndCharts(selectedEmployee=null, isType=false){
     drawCharts(perUser, tabs, columns, selectedEmployee, isType);
 }
 
-// ------------------------
-// DRAW TABLE FUNCTION
-// ------------------------
 function drawTable(perUser, tabs, selectedEmployee, isType){
     const table = document.getElementById('bigTable');
     const thead = table.querySelector('thead');
@@ -352,7 +337,6 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
         columns = STATE.userOrder;
     }
 
-    // HEADER
     const headerRow = document.createElement('tr');
     ['Operation','AVERAGE','TOTAL',...columns].forEach((text, idx)=>{
         const th = document.createElement('th');
@@ -385,7 +369,6 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
             downloadIcon.style.opacity = '0.6';
             downloadIcon.addEventListener('mouseenter', ()=> downloadIcon.style.opacity = '1');
             downloadIcon.addEventListener('mouseleave', ()=> downloadIcon.style.opacity = '0.6');
-
             downloadIcon.addEventListener('click', ()=> downloadTableCSV());
             th.appendChild(downloadIcon);
         }
@@ -394,7 +377,6 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
     });
     thead.appendChild(headerRow);
 
-    // BODY ROWS
     tabs.forEach((tab, idx)=>{
         const tr = document.createElement('tr');
         tr.dataset.tab = tab;
@@ -435,9 +417,6 @@ function drawTable(perUser, tabs, selectedEmployee, isType){
     applyColumnHeatmap(table);
 }
 
-// ------------------------
-// DRAW CHARTS
-// ------------------------
 function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
     const chartContainer = document.getElementById('multiChartContainer');
     chartContainer.innerHTML='';
@@ -509,35 +488,9 @@ function drawCharts(perUser, tabs, columns, selectedEmployee, isType){
     });
 }
 
-// ------------------------
-// DOWNLOAD CSV
-// ------------------------
-function downloadTableCSV(){
-    const table = document.getElementById('bigTable');
-    if(!table) return;
-
-    const rows = [];
-    table.querySelectorAll('thead tr, tbody tr').forEach(tr=>{
-        const cells = Array.from(tr.querySelectorAll('th,td'));
-        rows.push(cells.map(c=>c.innerText.trim().replace(/[\r\n\t]+/g,' ')).join(';'));
-    });
-    const csvContent = '\uFEFF' + rows.join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'session_data.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
 downloadBtn.addEventListener('click', downloadTableCSV);
 function toggleDownloadButton(show){ downloadBtn.style.display = show ? 'block' : 'none'; }
 
-// ------------------------
-// TIMELINE LOGIC
-// ------------------------
 const colorMap = {};
 function getColor(eventType, payload) {
     const key = payload ? `${eventType}-${JSON.stringify(payload)}` : `${eventType}-null`;
@@ -563,7 +516,6 @@ async function loadTimeline(sessionId){
 
     const totalDuration = data.totalDurationSeconds || 1;
 
-    // Summary
     timelineSummary.innerHTML = `<div class="summary">
       <strong>User:</strong> ${data.user_name}<br/>
       <strong>Employee Type:</strong> ${data.employee_type}<br/>
@@ -581,7 +533,7 @@ async function loadTimeline(sessionId){
         box.style.width = boxWidth + "px";
         box.style.background = getColor(event.event_type, event.payload);
         box.title = `Event: ${event.event_type}\nDuration: ${Math.round(event.durationSeconds)} sec\nTime: ${new Date(event.time_stamp).toLocaleTimeString()}\nPayload: ${JSON.stringify(event.payload||{})}`;
-        box.innerText = ""; // <-- remove text inside timeline boxes
+        box.innerText = "";
         timelineDiv.appendChild(box);
     });
 

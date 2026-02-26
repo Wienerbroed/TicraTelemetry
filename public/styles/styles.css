@@ -299,3 +299,14 @@ th {
     opacity: 1;
     transform: scale(1.1);
 }
+#downloadBtn {
+    margin: 20px auto;
+    padding: 4px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    display: none;
+}
+
+#downloadBtn:hover {
+    opacity: 0.85;
+}
