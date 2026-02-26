@@ -44,24 +44,22 @@ const createConfig = async ({ title, mode, event_type, payload_field, descriptio
   return configDoc;
 };
 
-// Build query from config (for datapool)
+// Build query from config
 const buildQueryFromConfig = (config) => {
   const baseQuery = { event_type: config.event_type, ...config.extra_query };
 
   const fields = { _id: 0, time_stamp: 1, user_name: 1 };
+
   if (config.mode === "session") {
     fields.event_number = 1;
     fields.session_id = 1;
   }
+
   if (config.mode === "event") {
     fields.employee_type = 1;
   }
 
-  if (Array.isArray(config.payload_field)) {
-    config.payload_field.forEach(f => fields[`payload.${f}`] = 1);
-  } else {
-    fields[`payload.${config.payload_field}`] = 1;
-  }
+  fields[`payload.${config.payload_field}`] = 1;
 
   return { [config.title]: { query: baseQuery, fields, description: config.description } };
 };
@@ -103,7 +101,9 @@ const updateConfig = async (oldTitle, updates) => {
   for (const key of allowedFields) {
     if (updates[key] !== undefined) {
       if (key === "mode") validateMode(updates[key]);
-      if (key === "description" && updates[key].length > 200) throw new Error("Description cannot exceed 200 characters");
+      if (key === "description" && updates[key].length > 200) {
+        throw new Error("Description cannot exceed 200 characters");
+      }
       filteredUpdates[key] = updates[key];
     }
   }
@@ -137,5 +137,4 @@ const deleteConfig = async (title) => {
 };
 
 export { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig };
-
 
