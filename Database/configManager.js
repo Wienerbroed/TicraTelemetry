@@ -136,5 +136,6 @@ const deleteConfig = async (title) => {
   return { success: true };
 };
 
+
 export { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig };
 
