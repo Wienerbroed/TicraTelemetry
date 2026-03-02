@@ -7,27 +7,28 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
 <style>
-#queryBoxesContainer {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin: 20px 0;
-}
-.query-box {
-  border: 1px solid #ccc;
-  max-width: 400px;
-  padding: 12px;
+#tableContainerWrapper { position: relative; margin-bottom: 20px; }
+#downloadBtn { display: none; margin: 10px auto; cursor: pointer; background: none; border: none; padding: 0; }
+#downloadBtn img { display: block; }
+
+.tooltip {
+  position: absolute;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #aaa;
   border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  max-width: 220px;
+  z-index: 9999;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
-.query-box.white { background-color: white; }
-.query-box.grey { background-color: #dcdcdc; }
-.query-box h3 { margin: 0 0 8px 0; }
-.query-box p { font-size: 0.95rem; margin: 0 0 8px 0; }
-.query-box img { max-width: 400px; max-height: 180px; object-fit: contain; margin-top: 8px; }
+.tooltip img {
+  max-width: 200px;
+  max-height: 120px;
+  display: block;
+  margin-top: 4px;
+}
 </style>
 </head>
 <body>
@@ -44,7 +45,7 @@
 
 <div id="filters">
   <div>
-    <strong style="display:block; margin-bottom:8px;">Date interval:</strong>
+    <strong>Date interval:</strong>
     <label>Start date: <input type="date" id="startDate"></label>
     <label>End date: <input type="date" id="endDate"></label>
   </div>
@@ -64,7 +65,6 @@
   </div>
 </div>
 
-<!-- Boxes container -->
 <div id="queryBoxesContainer"></div>
 
 <div id="tableContainerWrapper">
@@ -74,27 +74,26 @@
       <tbody></tbody>
     </table>
   </div>
+  <button id="downloadBtn" type="button" title="Download CSV">
+    <img src="/images/Excel-Logo.png" alt="Excel" width="80">
+  </button>
 </div>
 
 <div id="multiChartContainer"></div>
+
+<!-- Tooltip element -->
+<div id="tooltip" class="tooltip"></div>
 
 <footer>© TICRA foundation</footer>
 
 <script type="module">
 import { COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, renderMultipleBarCharts, applyStickyColumns, downloadTableCSV } from './scripts/utils.js';
 
-const STATE = {
-  fullEvents: [],
-  activeUsers: [],
-  userOrder: [],
-  rowSortStates: {},
-  eventTypeOrder: [],
-  allEmployeeTypes: []
-};
-
+const STATE = { fullEvents: [], activeUsers: [], userOrder: [], rowSortStates: {}, eventTypeOrder: [], allEmployeeTypes: [] };
 setDefaultDateRange('startDate','endDate',10);
 
-// Load filters
+const tooltip = document.getElementById('tooltip');
+
 async function loadEventTypes() {
   const data = await fetchJson('/eventQueries');
   const container = document.getElementById('eventTypeGroup');
@@ -130,177 +129,232 @@ function getCheckedValues(containerId){
   return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(i=>i.value);
 }
 
-// Apply button
+// APPLY BUTTON
 document.getElementById('applyButton').addEventListener('click', async () => {
   const selectedEventTypes = getCheckedValues('eventTypeGroup');
-  if (selectedEventTypes.length === 0) return;
-
+  if (!selectedEventTypes.length) return;
   const selectedEmployees = getCheckedEmployeeTypes();
   const startDate = document.getElementById('startDate').value;
   const endDate = document.getElementById('endDate').value;
 
   STATE.fullEvents = [];
   STATE.eventTypeOrder = [];
-
-  const boxesContainer = document.getElementById('queryBoxesContainer');
-  boxesContainer.innerHTML = '';
+  document.getElementById('queryBoxesContainer').innerHTML = '';
 
   for (const [idx, eventType] of selectedEventTypes.entries()) {
     const params = new URLSearchParams();
     params.append('inputEventType', eventType);
-    if (startDate) params.append('startTime', startDate + 'T00:00:00');
-    if (endDate) params.append('endTime', endDate + 'T23:59:59');
+    if (startDate) params.append('startTime', startDate+'T00:00:00');
+    if (endDate) params.append('endTime', endDate+'T23:59:59');
     if (selectedEmployees) selectedEmployees.forEach(emp => params.append('employeeType', emp));
 
     const url = `/data?${params.toString()}`;
     const data = await fetchJson(url);
 
-    // Map events safely
     const events = (data.events ?? []).map(ev => {
       let selection = "unknown";
-
       if (ev.payload && Object.keys(ev.payload).length) {
         selection = String(Object.values(ev.payload)[0] ?? "unknown");
       }
-
-      return {
-        eventType,
-        user: ev.user_name ?? "unknown",
-        selection,
-        employee_type: ev.employee_type ?? "unknown",
-        count: ev.count ?? 0
-      };
+      return { eventType, user: ev.user_name ?? "unknown", selection, employee_type: ev.employee_type ?? "unknown", count: ev.count ?? 0 };
     });
 
     STATE.fullEvents.push(...events);
     STATE.eventTypeOrder.push(eventType);
-
-    // Fetch config for description + image
-    try {
-      const configQuery = await fetchJson(`/api/configs/${encodeURIComponent(eventType)}`);
-      const description = configQuery.description ?? "";
-      const imgObj = configQuery.extra_query?.image;
-
-      const block = document.createElement("div");
-      block.classList.add("query-box", idx % 2 === 1 ? 'grey' : 'white');
-
-      const header = document.createElement("h3");
-      header.textContent = eventType;
-      block.appendChild(header);
-
-      if (description) {
-        const p = document.createElement("p");
-        p.textContent = description;
-        block.appendChild(p);
-      }
-
-      if (imgObj?.data) {
-        const img = document.createElement("img");
-        img.src = `data:${imgObj.contentType};base64,${imgObj.data}`;
-        block.appendChild(img);
-      }
-
-      boxesContainer.appendChild(block);
-    } catch (err) {
-      console.warn("No config for", eventType);
-    }
   }
 
-  // Remove duplicates
   STATE.eventTypeOrder = [...new Set(STATE.eventTypeOrder)];
-
-  // Render table and charts
   renderTableAndCharts();
 });
 
 // PER-USER DATA
 function buildPerUser(events){
-  const perUser={}; const totals={};
+  const perUser={}, totals={};
   events.forEach(e=>totals[e.user]=(totals[e.user]??0)+e.count);
   STATE.activeUsers = Object.keys(totals).filter(u=>totals[u]>0).sort();
   STATE.userOrder = [...STATE.activeUsers];
   STATE.activeUsers.forEach(u=>perUser[u]={});
   events.forEach(e=>{
-    if(totals[e.user]>0)
-      perUser[e.user][`${e.eventType}::${e.selection}`] = (perUser[e.user][`${e.eventType}::${e.selection}`]??0)+e.count;
+    if(totals[e.user]>0) perUser[e.user][`${e.eventType}::${e.selection}`] = (perUser[e.user][`${e.eventType}::${e.selection}`]??0)+e.count;
   });
   return perUser;
 }
 function getSelections(perUser){ return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort(); }
 
 // DOWNLOAD BUTTON
-const downloadBtn = document.createElement('span');
-downloadBtn.innerHTML='⬇'; downloadBtn.title='Download CSV';
-downloadBtn.style.position='absolute'; downloadBtn.style.top='4px'; downloadBtn.style.left='6px';
-downloadBtn.style.fontSize='12px'; downloadBtn.style.cursor='pointer'; downloadBtn.style.opacity='0.6';
-downloadBtn.style.display='none';
-downloadBtn.addEventListener('mouseenter',()=>downloadBtn.style.opacity='1');
-downloadBtn.addEventListener('mouseleave',()=>downloadBtn.style.opacity='0.6');
-downloadBtn.addEventListener('click',(e)=>{e.stopPropagation(); downloadTableCSV();});
+const downloadBtn = document.getElementById('downloadBtn');
+downloadBtn.addEventListener('click',()=>downloadTableCSV());
 function toggleDownloadButton(show){ downloadBtn.style.display = show?'block':'none'; }
 
-// DRAW TABLE (unchanged)
-function drawTable(perUser,selections){
-  const table=document.getElementById('bigTable');
-  const thead=table.querySelector('thead'); const tbody=table.querySelector('tbody');
-  thead.innerHTML=''; tbody.innerHTML='';
+// DRAW TABLE
+async function drawTable(perUser, selections) {
+  const table = document.getElementById('bigTable');
+  const thead = table.querySelector('thead'); 
+  const tbody = table.querySelector('tbody');
+  thead.innerHTML = ''; 
+  tbody.innerHTML = '';
 
-  const headerRow=document.createElement('tr');
-  ['Operation','MOST USED','AVERAGE','TOTAL',...STATE.userOrder].forEach((text,index)=>{
-    const th=document.createElement('th'); th.classList.add('rotate','sticky'); 
-    if(index===0) th.style.position='relative';
-    const div=document.createElement('div'); div.textContent=text; th.appendChild(div);
-    if(index===0) th.appendChild(downloadBtn);
+  // ----------------------
+  // HEADER
+  // ----------------------
+  const headerRow = document.createElement('tr');
+  ['Operation', 'MOST USED', 'AVERAGE', 'TOTAL', ...STATE.userOrder].forEach((text, index) => {
+    const th = document.createElement('th'); 
+    th.classList.add('rotate', 'sticky');
+    if (index === 0) th.style.position = 'relative';
+    const div = document.createElement('div'); 
+    div.textContent = text;
+    th.appendChild(div); 
     headerRow.appendChild(th);
   });
   thead.appendChild(headerRow);
 
-  STATE.eventTypeOrder.forEach((eventType, idx)=>{
-    const eventSelections = selections.filter(s=>s.startsWith(eventType+'::'));
-    const rowClass = idx % 2 === 0 ? 'eventtype-row-white':'eventtype-row-gray';
-    const columnMax = {}; const columnSecond = {};
-    STATE.userOrder.forEach(u=>{
-      const vals = eventSelections.map(sel => perUser[u]?.[sel]??0);
-      const maxVal = Math.max(...vals);
-      let secondVal = vals.filter(v=>v<maxVal).reduce((prev,curr)=>Math.max(prev,curr),0);
-      if(secondVal<maxVal/2) secondVal=0;
-      columnMax[u]=maxVal; columnSecond[u]=secondVal;
+  // ----------------------
+  // TABLE BODY
+  // ----------------------
+  let rowColorToggle = false; // start with white
+  for (const eventType of STATE.eventTypeOrder) {
+    const eventSelections = selections.filter(s => s.startsWith(eventType + '::'));
+
+    // Fetch config once for this eventType
+    const config = await fetchJson(`/api/configs/${encodeURIComponent(eventType)}`).catch(() => null);
+    const description = config?.description ?? '';
+    const imgSrc = config?.extra_query?.image?.data
+      ? `data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}`
+      : null;
+
+    // Compute column max for heatmap
+    const columnMax = {}; 
+    STATE.userOrder.forEach(u => {
+      let maxVal = 0; 
+      eventSelections.forEach(sel => { 
+        const val = perUser[u]?.[sel] ?? 0; 
+        if (val > maxVal) maxVal = val; 
+      }); 
+      columnMax[u] = maxVal;
     });
-    eventSelections.forEach(sel=>{
-      const tr=document.createElement('tr'); tr.classList.add('sortable',rowClass);
-      const displayName = sel.split('::')[1]; tr.dataset.operation=displayName;
-      tr.appendChild(createCell(displayName,false,null,'operation-cell'));
-      const total = STATE.userOrder.reduce((sum,u)=>sum + (perUser[u]?.[sel]??0),0);
-      const avg = STATE.userOrder.length?(total/STATE.userOrder.length).toFixed(2):0;
-      let mostUsed=0; STATE.userOrder.forEach(u=>{if((perUser[u]?.[sel]??0)===columnMax[u] && columnMax[u]>0) mostUsed++;});
-      tr.appendChild(createCell(mostUsed,false,null,'summary-cell'));
-      tr.appendChild(createCell(avg,false,null,'summary-cell'));
-      tr.appendChild(createCell(total,false,null,'summary-cell'));
-      STATE.userOrder.forEach(u=>{
-        const val=perUser[u]?.[sel]??0;
-        const td=createCell(val,false,null,'user-cell');
-        if(val===columnMax[u] && columnMax[u]>0) td.classList.add('heatmap-max');
-        else if(val===columnSecond[u] && columnSecond[u]>0) td.classList.add('heatmap-second');
+
+    for (const sel of eventSelections) {
+      const tr = document.createElement('tr'); 
+      tr.classList.add('sortable');
+
+      // ----------------------
+      // SET ROW COLOR FOR OPERATION COLUMN ONLY
+      // ----------------------
+      tr.classList.add(rowColorToggle ? 'eventtype-grey' : 'eventtype-white');
+
+      const displayName = sel.split('::')[1];
+
+      // ----------------------
+      // OPERATION CELL
+      // ----------------------
+      const opCell = createCell(displayName, false, null, 'operation-cell');
+      tr.appendChild(opCell);
+
+      // ----------------------
+      // TOOLTIP
+      // ----------------------
+      opCell.addEventListener('mouseenter', () => {
+        tooltip.innerHTML = ''; 
+        tooltip.style.display = 'block';
+
+        if (eventType) {
+          const titleP = document.createElement('p');
+          titleP.textContent = eventType;
+          titleP.style.fontWeight = 'bold';
+          titleP.style.margin = '0 0 4px 0';
+          tooltip.appendChild(titleP);
+        }
+
+        if (description) { 
+          const p = document.createElement('p'); 
+          p.textContent = description; 
+          p.style.margin = '0 0 4px 0'; 
+          tooltip.appendChild(p); 
+        }
+        if (imgSrc) { 
+          const img = document.createElement('img'); 
+          img.src = imgSrc; 
+          tooltip.appendChild(img); 
+        }
+        const selP = document.createElement('p'); 
+        selP.textContent = displayName; 
+        selP.style.margin = '4px 0 0 0'; 
+        tooltip.appendChild(selP);
+
+        const rect = opCell.getBoundingClientRect();
+        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 6 + window.scrollY}px`;
+        tooltip.style.left = `${rect.right - tooltip.offsetWidth + window.scrollX}px`;
+      });
+      opCell.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+      // ----------------------
+      // SUMMARY CELLS
+      // ----------------------
+      const total = STATE.userOrder.reduce((sum, u) => sum + (perUser[u]?.[sel] ?? 0), 0);
+      const avg = STATE.userOrder.length ? (total / STATE.userOrder.length).toFixed(2) : 0;
+      let mostUsed = 0; 
+      STATE.userOrder.forEach(u => {
+        if ((perUser[u]?.[sel] ?? 0) === columnMax[u] && columnMax[u] > 0) mostUsed++;
+      });
+      tr.appendChild(createCell(mostUsed, false, null, 'summary-cell'));
+      tr.appendChild(createCell(avg, false, null, 'summary-cell'));
+      tr.appendChild(createCell(total, false, null, 'summary-cell'));
+
+      // ----------------------
+      // USER CELLS (heatmap)
+      // ----------------------
+      STATE.userOrder.forEach(u => {
+        const val = perUser[u]?.[sel] ?? 0;
+        const intensity = columnMax[u] ? Math.pow(val / columnMax[u], 0.5) : 0;
+        const hue = 120, lightness = 100 - intensity * 60;
+        const color = intensity > 0.6 ? '#fff' : '#000';
+        const td = createCell(val, false, null, 'user-cell');
+        td.style.backgroundColor = `hsl(${hue},70%,${lightness}%)`; 
+        td.style.color = color;
         tr.appendChild(td);
       });
-      tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,4));
+
+      // ----------------------
+      // ROW HOVER
+      // ----------------------
+      tr.addEventListener('mouseenter', () => { 
+        opCell.style.backgroundColor = 'rgba(252,199,93,0.5)'; 
+        opCell.style.fontWeight = 'bold'; 
+      });
+      tr.addEventListener('mouseleave', () => { 
+        opCell.style.backgroundColor = ''; 
+        opCell.style.fontWeight = ''; 
+      });
+
+      // ----------------------
+      // ROW CLICK SORTING
+      // ----------------------
+      tr.addEventListener('click', () => sortTableByRow(table, tr, STATE.rowSortStates, 4));
+
       tbody.appendChild(tr);
-    });
-  });
-  applyStickyColumns(table,4);
-  toggleDownloadButton(tbody.children.length>0);
+    }
+
+    // ----------------------
+    // Toggle color for next eventType
+    // ----------------------
+    rowColorToggle = !rowColorToggle;
+  }
+
+  applyStickyColumns(table, 4);
+  toggleDownloadButton(tbody.children.length > 0);
 }
 
-// Render table + charts
+
+
+// RENDER TABLE & CHARTS
 function renderTableAndCharts(){
-  const perUser = buildPerUser(STATE.fullEvents);
-  const selections = getSelections(perUser);
+  const perUser=buildPerUser(STATE.fullEvents);
+  const selections=getSelections(perUser);
   drawTable(perUser,selections);
   const chartContainer=document.getElementById('multiChartContainer');
-  chartContainer.style.display='grid';
-  chartContainer.style.gridTemplateColumns='repeat(2,1fr)';
-  chartContainer.style.gap='20px';
-  renderMultipleBarCharts(chartContainer, perUser, STATE.eventTypeOrder, COLORS, false);
+  chartContainer.style.display='grid'; chartContainer.style.gridTemplateColumns='repeat(2,1fr)'; chartContainer.style.gap='20px';
+  renderMultipleBarCharts(chartContainer,perUser,STATE.eventTypeOrder,COLORS,false);
 }
 
 loadEventTypes(); loadEmployeeTypes();
