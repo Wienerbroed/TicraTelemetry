@@ -9,19 +9,21 @@
 <style>
 /* Timeline styles */
 .timeline-wrapper {
-    margin-top: 20px;
+    margin-top: 120px;        
     width: 100%;
     max-width: 1200px;
     overflow-x: auto;
     border-top: 3px solid #ccc;
-    padding-top: 20px;
+    padding-top: 120px;       
     position: relative;
+    justify-content: flex-start;
 }
+
 .timeline {
     display: flex;
     align-items: flex-start;
     height: 80px;
-    min-width: 1200px;
+    min-width: 800px;
     width: max-content;
 }
 .event-box { 
@@ -82,39 +84,30 @@
 .legend { margin-top:25px; display:flex; gap:40px; }
 
 
-/* Description Image */
-#descriptionImageContainer {
-    display:grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap:16px;
-    margin:20px 0;
+.tooltip {
+  position: absolute;         /* important */
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  max-width: 300px;
+  z-index: 9999;
+  display: none;              /* hidden by default */
+  pointer-events: none;       /* so it doesn’t block hover */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
-.description-image-block {
-    max-width: 400px;
-    border: 1px solid #ccc;
-    padding: 12px;
-    border-radius: 6px;
-    background: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
-.description-image-block img {
-    max-width: 400px;
-    max-height: 180px;
-    margin-top: 8px;
-    object-fit: contain;
-}
-.description-image-block p {
-    font-size: 0.95rem;
-    margin: 0;
+.tooltip img {
+  max-width: 300px;
+  max-height: 200px;
+  display: block;
+  margin-top: 4px;
 }
 
-/* Table wrapper for download button */
+
 #tableContainerWrapper {
     margin-top: 20px;
-    text-align: center;
+    text-align: center; 
 }
 #downloadBtn {
     cursor: pointer;
@@ -123,38 +116,60 @@
     display: none;
     transition: opacity 0.2s;
 }
-#downloadBtn:hover { opacity: 1; }
-
-/* Tooltip */
-.tooltip {
-  position: absolute;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid #aaa;
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 12px;
-  max-width: 220px;
-  z-index: 9999;
-  display: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-}
-.tooltip img {
-  max-width: 200px;
-  max-height: 120px;
-  display: block;
-  margin-top: 4px;
+#downloadBtn:hover {
+    opacity: 1;
 }
 
-/* Operation column alternating colors */
-tr.eventtype-row-white td.operation-cell { background-color: #fff; }
-tr.eventtype-row-gray td.operation-cell { background-color: #dcdcdc; }
 
-/* Hover highlight for operation */
-tr.sortable:hover td.operation-cell { background-color: rgba(252, 199, 93, 0.5) !important; font-weight: bold; }
+.event-marker {
+    position: absolute;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 2px;
+}
+
+.timeline-container { position: relative; }
+.event-box {
+    display: inline-block;
+    height: 40px;
+    position: relative;
+    margin-right: 2px;
+    border-radius: 4px;
+}
+.tabpage-text {
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    word-break: break-word;
+    position: absolute;
+    width: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.event-line {
+    width: 2px;
+    position: absolute;
+}
+
+.event-label {
+    position: absolute;
+    top: -15px; 
+    left: -10px;
+    transform: rotate(-45deg);
+    font-size: 10px;
+    white-space: nowrap;
+    color: #000;
+}
+
+
+
 
 </style>
 </head>
+
 <body>
+<div id="tooltip" class="tooltip"></div>    
 
 <header>
     <div class="navbar">
@@ -175,6 +190,10 @@ tr.sortable:hover td.operation-cell { background-color: rgba(252, 199, 93, 0.5) 
         <label>End Time:
             <input type="datetime-local" id="endTime">
         </label>
+
+        <button type="button" class="preset-btn" data-range="10">Last 10 days</button>
+        <button type="button" class="preset-btn" data-range="30">Last 1 month</button>
+        <button type="button" class="preset-btn" data-range="all">All time</button>
     </div>
 
     <div>
@@ -205,9 +224,6 @@ tr.sortable:hover td.operation-cell { background-color: rgba(252, 199, 93, 0.5) 
   </div>
 </div>
 
-<!-- Tooltip -->
-<div id="tooltip" class="tooltip"></div>
-
 <div id="timelineContainer" style="display:none; margin:20px 0;">
   <h3>Session Timeline</h3>
   <div id="timelineSummary"></div>
@@ -219,25 +235,25 @@ tr.sortable:hover td.operation-cell { background-color: rgba(252, 199, 93, 0.5) 
 
 <div id="multiChartContainer" class="chart-container"></div>
 
-<footer>© TICRA foundation</footer>
+<footer>
+  © TICRA foundation
+</footer>
 
 <script type="module">
 import { 
   COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, renderBarChart, 
-  applyStickyColumns, applyColumnHeatmap, formatSecondsToHMS, downloadTableCSV
+  applyStickyColumns, formatSecondsToHMS, downloadTableCSV
 } from './scripts/utils.js';
 
 const STATE = { fullSessions: [], activeUsers: [], userOrder: [], sessionOrder: [], rowSortStates: {} };
+
 const eventTypeSelect = document.getElementById("eventTypeSelect");
 const employeeSelect = document.getElementById("employeeSelect");
 const startInput = document.getElementById("startTime");
 const endInput = document.getElementById("endTime");
 const applyButton = document.getElementById("applyButton");
-const descriptionImageContainer = document.getElementById('descriptionImageContainer');
-const timelineContainer = document.getElementById('timelineContainer');
-const timelineSummary = document.getElementById('timelineSummary');
-const timelineDiv = document.getElementById('timeline');
-const timelineLegend = document.getElementById('timelineLegend');
+
+const tooltip = document.getElementById('tooltip');
 
 // Download button
 const downloadBtn = document.createElement('span');
@@ -246,9 +262,6 @@ downloadBtn.innerHTML = '<img src="/images/Excel-Logo.png" alt="Excel" width="10
 downloadBtn.title = 'Download CSV';
 downloadBtn.addEventListener('click', () => { downloadTableCSV(); });
 document.getElementById('tableContainerWrapper').appendChild(downloadBtn);
-
-// Tooltip reference
-const tooltip = document.getElementById('tooltip');
 
 // Initialize default date range
 setDefaultDateRange('startTime','endTime',10);
@@ -276,21 +289,53 @@ async function initDropdowns() {
 }
 initDropdowns();
 
-// Load description and images
-async function loadDescriptionImageBoxes(configTitle){
-    descriptionImageContainer.innerHTML='';
-    if(!configTitle) return;
-    try{
+// Format datetime-local
+function formatDateTimeLocal(date) {
+    const pad = n => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// Preset buttons
+function setPresetRange(range) {
+    const now = new Date();
+    let start;
+
+    if (range === 'all') {
+        start = new Date('2026-01-01T00:00:00');
+    } else {
+        start = new Date();
+        if (range === 30) start.setMonth(now.getMonth() - 1);
+        else start.setDate(now.getDate() - range);
+    }
+
+    startInput.value = formatDateTimeLocal(start);
+    endInput.value = formatDateTimeLocal(now);
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const range = btn.dataset.range;
+        setPresetRange(range === 'all' ? 'all' : parseInt(range));
+    });
+});
+
+// Tooltip function (only table row tooltips)
+async function loadDescriptionTooltip(configTitle) {
+    if (!configTitle) return;
+    try {
         const configQuery = await fetchJson(`/api/configs/${encodeURIComponent(configTitle)}`);
+        const title = configQuery.title ?? configTitle;
         const description = configQuery.description ?? '';
         const imgObj = configQuery.extra_query?.image;
-        const block = document.createElement("div");
-        block.classList.add("description-image-block");
-        if(description){ const p=document.createElement("p"); p.textContent=description; block.appendChild(p); }
-        if(imgObj?.data){ const img=document.createElement("img"); img.src=`data:${imgObj.contentType};base64,${imgObj.data}`; block.appendChild(img);}
-        descriptionImageContainer.appendChild(block);
-        descriptionImageContainer.querySelectorAll('.description-image-block').forEach((b,idx)=>b.style.background=idx%2===0?'#fff':'#eee');
-    } catch(e){ console.warn("No config found:", configTitle); }
+
+        let html = `<strong>${title}</strong>`;
+        if (description) html += `<div>${description}</div>`;
+        if (imgObj?.data) html += `<img src="data:${imgObj.contentType};base64,${imgObj.data}" style="margin-top:6px; max-width:300px; max-height:200px;">`;
+
+        tooltip.innerHTML = html;
+    } catch (e) {
+        tooltip.innerHTML = `<strong>${configTitle}</strong><div>No description available</div>`;
+    }
 }
 
 // Apply filters
@@ -298,10 +343,10 @@ applyButton.addEventListener('click', async e=>{
     e.preventDefault();
     const selectedConfig = eventTypeSelect.value;
     if(!selectedConfig) return;
+
     const selectedEmployee = employeeSelect.value || null;
     const selectedOption = employeeSelect.querySelector(`option[value="${selectedEmployee}"]`);
     const isType = selectedOption?.dataset.type==='employeeType';
-    await loadDescriptionImageBoxes(selectedConfig);
 
     const startTime = startInput.value || new Date(Date.now()-30*24*60*60*1000).toISOString();
     const endTime = endInput.value || new Date().toISOString();
@@ -331,7 +376,6 @@ function renderTableAndCharts(selectedEmployee=null,isType=false){
         table.querySelector('tbody').innerHTML='';
         document.getElementById('multiChartContainer').innerHTML='';
         toggleDownloadButton(false);
-        timelineContainer.style.display='none';
         return;
     }
 
@@ -351,11 +395,11 @@ function renderTableAndCharts(selectedEmployee=null,isType=false){
 // Toggle download button
 function toggleDownloadButton(show){ downloadBtn.style.display=show?'block':'none'; }
 
-// Color mapping
+// Color mapping for charts
 const colorMap={};
 function getColor(eventType,payload){ const key=payload?`${eventType}-${JSON.stringify(payload)}`:`${eventType}-null`; if(!colorMap[key]){ const hue=(Object.keys(colorMap).length*100)%360; colorMap[key]=payload?`hsl(${hue},50%,40%)`:"#888"; } return colorMap[key]; }
 
-// Draw table with alternating operation-cell colors & tooltips
+// Draw table
 function drawTable(perUser, tabs, selectedEmployee, isType) {
     const table = document.getElementById('bigTable');
     const thead = table.querySelector('thead');
@@ -363,30 +407,49 @@ function drawTable(perUser, tabs, selectedEmployee, isType) {
     thead.innerHTML = '';
     tbody.innerHTML = '';
 
-    // Determine columns (users or sessions)
     let columns = [];
-    if (selectedEmployee && !isType) { columns = [...new Set(STATE.fullSessions.map(s => s.session_id))].sort(); }
-    else { columns = STATE.userOrder; }
+    if (selectedEmployee && !isType) columns = [...new Set(STATE.fullSessions.map(s => s.session_id))].sort();
+    else columns = STATE.userOrder;
 
-    // Build table header
     const headerRow = document.createElement('tr');
     ['Operation', 'AVERAGE', 'TOTAL', ...columns].forEach((text, idx) => {
         const th = document.createElement('th');
         th.classList.add('rotate', 'sticky');
-        if(idx===0) th.style.position='relative';
-        const div = document.createElement('div'); div.textContent=text; th.appendChild(div);
+        if (idx === 0) th.style.position = 'relative';
+
+        let displayText = text;
+        let sessionIdForClick = text;
+
+        if (selectedEmployee && !isType && idx >= 3) {
+            const sessionEvents = STATE.fullSessions.filter(s => s.session_id === text);
+            if (sessionEvents.length) {
+                displayText = new Date(sessionEvents[0].start_time).toLocaleString();
+                sessionIdForClick = sessionEvents[0].session_id;
+            }
+        }
+
+        const div = document.createElement('div');
+        div.textContent = displayText;
+
+        if (selectedEmployee && !isType && idx >= 3) {
+            div.style.cursor = "pointer";
+            div.style.textDecoration = "underline";
+            div.addEventListener('click', () => loadTimeline(sessionIdForClick));
+        }
+
+        th.appendChild(div);
+        if (idx >= 3) th.classList.add('user-cell');
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
 
-    // Compute column max for heatmap
     const columnMax = {};
     columns.forEach((col) => {
         let maxVal = 0;
         tabs.forEach(tab => {
-            let val = selectedEmployee && !isType ?
-                STATE.fullSessions.filter(s => s.tab === tab && s.session_id === col).reduce((a,b)=>a+b.durationSeconds,0)
-                : perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0) || 0;
+            let val = 0;
+            if (selectedEmployee && !isType) val = STATE.fullSessions.filter(s => s.tab === tab && s.session_id === col).reduce((a,b)=>a+b.durationSeconds,0);
+            else val = perUser[col]?.filter(s => s.tab === tab).reduce((a,b)=>a+b.durationSeconds,0) || 0;
             if(val>maxVal) maxVal=val;
         });
         columnMax[col]=maxVal;
@@ -394,80 +457,267 @@ function drawTable(perUser, tabs, selectedEmployee, isType) {
 
     function getHeatmapColor(val, maxVal) {
         if(maxVal===0) return { bg:'white', color:'#000' };
-        const intensity=Math.pow(val/maxVal,0.5);
-        const hue=120;
-        return { bg:`hsl(${hue},70%,${100-intensity*60}%)`, color: intensity>0.6?'#fff':'#000' };
+        const intensity = Math.pow(val/maxVal,0.5);
+        const hue = 120;
+        const lightness = 100 - intensity*60;
+        const textColor = intensity>0.6 ? '#fff' : '#000';
+        return { bg:`hsl(${hue},70%,${lightness}%)`, color: textColor };
     }
 
-    // Build table body with alternating row colors & tooltips
     tabs.forEach((tab, idx) => {
         const tr = document.createElement('tr');
-        tr.dataset.tab=tab;
-        tr.classList.add('sortable', idx%2===0?'eventtype-row-white':'eventtype-row-gray');
+        tr.dataset.tab = tab;
+        tr.classList.add(idx%2===0 ? 'eventtype-row-white' : 'eventtype-row-gray', 'sortable');
 
-        // Operation cell
-        const opCell = createCell(tab,false,null,'operation-cell');
-        tr.appendChild(opCell);
+        const opCell = createCell(tab, false, null, 'operation-cell');
 
-        // Tooltip for operation cell
         opCell.addEventListener('mouseenter', async () => {
-            tooltip.innerHTML=''; tooltip.style.display='block';
-            let config={};
-            try{ config = await fetchJson(`/api/configs/${encodeURIComponent(tab)}`); } catch(e){}
-            const titleP = document.createElement('p'); titleP.textContent=tab; titleP.style.fontWeight='bold'; titleP.style.margin='0 0 4px 0'; tooltip.appendChild(titleP);
-            if(config.description){ const p=document.createElement('p'); p.textContent=config.description; p.style.margin='0 0 4px 0'; tooltip.appendChild(p); }
-            if(config.extra_query?.image?.data){ const img=document.createElement('img'); img.src=`data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}`; tooltip.appendChild(img);}
-            const tabP=document.createElement('p'); tabP.textContent=tab; tabP.style.margin='4px 0 0 0'; tooltip.appendChild(tabP);
+            tooltip.style.display = 'block';
+            tooltip.innerHTML = '';
+            let configTitle = eventTypeSelect.value || tab;
+            await loadDescriptionTooltip(configTitle);
+
             const rect = opCell.getBoundingClientRect();
             tooltip.style.top = `${rect.top - tooltip.offsetHeight - 6 + window.scrollY}px`;
             tooltip.style.left = `${rect.right - tooltip.offsetWidth + window.scrollX}px`;
         });
-        opCell.addEventListener('mouseleave',()=>{ tooltip.style.display='none'; });
+        opCell.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
 
-        // Summary cells
-        const totalsArray = columns.map(col => selectedEmployee && !isType ?
-            STATE.fullSessions.filter(s => s.tab===tab && s.session_id===col).reduce((a,b)=>a+b.durationSeconds,0)
-            : perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0) || 0 );
+        tr.appendChild(opCell);
+
+        const totalsArray = columns.map(col => {
+            if(selectedEmployee && !isType) return STATE.fullSessions.filter(s=>s.tab===tab && s.session_id===col).reduce((a,b)=>a+b.durationSeconds,0);
+            else return perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0) || 0;
+        });
         const total = totalsArray.reduce((a,b)=>a+b,0);
-        const avg = totalsArray.length? total/totalsArray.length : 0;
+        const avg = totalsArray.length ? total / totalsArray.length : 0;
         tr.appendChild(createCell(formatSecondsToHMS(avg),false,null,'summary-cell'));
         tr.appendChild(createCell(formatSecondsToHMS(total),false,null,'summary-cell'));
 
-        // User/session cells with heatmap
         totalsArray.forEach((val,i)=>{
-            const td = createCell(formatSecondsToHMS(val),false,null,'user-cell');
-            td.dataset.sort=val;
-            const {bg,color}=getHeatmapColor(val,columnMax[columns[i]]);
-            td.style.backgroundColor=bg; td.style.color=color;
+            const td=createCell(formatSecondsToHMS(val),false,null,'user-cell');
+            td.dataset.sort = val;
+            const { bg, color } = getHeatmapColor(val,columnMax[columns[i]]);
+            td.style.backgroundColor = bg;
+            td.style.color = color;
             tr.appendChild(td);
         });
 
-        // Row click for sorting
         tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,3));
-
         tbody.appendChild(tr);
     });
 
     applyStickyColumns(table,3);
 }
 
+// ---------------------------- NEW TIMELINE FUNCTION ----------------------------
+async function loadTimeline(sessionId) {
+    const timelineContainer = document.getElementById('timelineContainer');
+    const timelineDiv = document.getElementById('timeline');
+    const timelineLegend = document.getElementById('timelineLegend');
+    const timelineSummary = document.getElementById('timelineSummary');
+    const tooltip = document.getElementById('tooltip');
 
+    timelineContainer.style.display = 'block';
+    timelineDiv.innerHTML = timelineLegend.innerHTML = timelineSummary.innerHTML = '';
+    Object.keys(colorMap).forEach(k => delete colorMap[k]);
+    timelineDiv.style.position = 'relative'; // for absolute children
+
+    try {
+        const response = await fetch(`/sessionTimeline?sessionId=${sessionId}`);
+        const data = await response.json();
+        if (!data.timeline?.length) {
+            timelineSummary.innerHTML = '<p>No events found for this session.</p>';
+            return;
+        }
+
+        // --- Helper: format seconds to hh:mm:ss
+        function formatDuration(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+        }
+
+        // --- Session summary ---
+        const timestamps = data.timeline.map(ev => new Date(ev.time_stamp)).filter(Boolean);
+        const startTime = timestamps.length ? new Date(Math.min(...timestamps)) : null;
+        const endTime = timestamps.length ? new Date(Math.max(...timestamps)) : null;
+
+        timelineSummary.innerHTML = `
+            <div class="summary">
+                <strong>Session ID:</strong> ${data.sessionId}<br/>
+                <strong>User:</strong> ${data.user_name}<br/>
+                <strong>Employee Type:</strong> ${data.employee_type}<br/>
+                <strong>Total Events:</strong> ${data.totalEvents}<br/>
+                <strong>Duration:</strong> ${startTime?.toLocaleString() ?? 'N/A'} - ${endTime?.toLocaleString() ?? 'N/A'} (Total time spent: ${formatDuration(data.totalDurationSeconds)})
+            </div>
+        `;
+
+        const totalDuration = data.totalDurationSeconds || 1;
+        const MIN_TOTAL_WIDTH = 1200;
+        const timelineTotalWidth = Math.max(data.timeline.length * 50, MIN_TOTAL_WIDTH);
+
+        // --- Tabpage blocks ---
+        const tabEventMap = {};
+        data.timeline.forEach(ev => {
+            if (ev.event_type === 'Tabpage') {
+                const box = document.createElement('div');
+                box.className = 'event-box';
+                box.dataset.eventNumber = ev.event_number;
+                box.dataset.startTime = new Date(ev.time_stamp).getTime();
+                box.dataset.durationSeconds = ev.durationSeconds;
+
+                const width = Math.max((ev.durationSeconds / totalDuration) * timelineTotalWidth, 20);
+                box.style.width = width + 'px';
+                box.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#666';
+
+                const text = document.createElement('div');
+                text.className = 'tabpage-text';
+                text.innerText = ev.payload ?? '';
+                box.appendChild(text);
+
+                // Hover tooltip for tabpage block
+                box.addEventListener('mouseenter', e => {
+                    tooltip.style.display = 'block';
+                    const startTimeStr = new Date(ev.time_stamp).toLocaleTimeString();
+                    tooltip.innerText = `Tab: ${ev.payload ?? 'N/A'}\nStart Time: ${startTimeStr}\nTotal time spent: ${formatDuration(ev.durationSeconds)}`;
+                });
+                box.addEventListener('mousemove', e => {
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                });
+                box.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+
+                timelineDiv.appendChild(box);
+                tabEventMap[ev.event_number] = box;
+            }
+        });
+
+        // --- Other events as vertical lines passing through timeline ---
+        data.timeline.forEach(ev => {
+            if (ev.event_type !== 'Tabpage') {
+                // Find nearest previous tabpage
+                const tabEvent = data.timeline.slice(0, data.timeline.indexOf(ev)).reverse().find(e => e.event_type === 'Tabpage');
+                if (!tabEvent) return;
+                const parentBox = tabEventMap[tabEvent.event_number];
+                if (!parentBox) return;
+
+                const line = document.createElement('div');
+                line.className = 'event-line';
+                line.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#333';
+                line.style.position = 'absolute';
+
+                // Compute left relative to parent box
+                const boxWidth = parentBox.offsetWidth;
+                const boxStartTime = new Date(tabEvent.time_stamp).getTime();
+                const boxEndTime = boxStartTime + tabEvent.durationSeconds * 1000;
+                const eventTime = new Date(ev.time_stamp).getTime();
+                const percent = Math.min(Math.max((eventTime - boxStartTime) / (boxEndTime - boxStartTime), 0), 1);
+
+                line.style.left = `${parentBox.offsetLeft + percent * boxWidth}px`;
+                line.style.top = `-50px`;
+                line.style.width = '2px';
+                line.style.height = `${parentBox.offsetHeight + 50}px`;
+
+                // Rotated label above line
+                const label = document.createElement('div');
+                label.className = 'event-label';
+                label.innerText = `${ev.event_type}: ${ev.payload ?? ''}`;
+                line.appendChild(label);
+
+                // Hover tooltip for event line
+                line.addEventListener('mouseenter', e => {
+                    tooltip.style.display = 'block';
+                    tooltip.innerText = `${ev.event_type}\nPayload: ${ev.payload ?? 'None'}\nTime: ${new Date(ev.time_stamp).toLocaleTimeString()}`;
+                });
+                line.addEventListener('mousemove', e => {
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                });
+                line.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+                timelineDiv.appendChild(line);
+            }
+        });
+
+        // --- Legend ---
+        const grouped = {};
+        Object.keys(colorMap).forEach(key => {
+            const [type, payloadStr] = key.split(/-(.+)/);
+            if (!grouped[type]) grouped[type] = [];
+            grouped[type].push({ key, payloadStr, color: colorMap[key] });
+        });
+        Object.keys(grouped).forEach(type => {
+            const column = document.createElement('div');
+            column.className = 'legend-column';
+            const title = document.createElement('div');
+            title.className = 'legend-title';
+            title.innerText = type;
+            column.appendChild(title);
+
+            grouped[type].forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'legend-item';
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = item.color;
+                const label = document.createElement('span');
+                label.innerText = item.payloadStr === 'null' ? 'No payload' : item.payloadStr;
+                itemDiv.appendChild(colorBox);
+                itemDiv.appendChild(label);
+                column.appendChild(itemDiv);
+            });
+
+            timelineLegend.appendChild(column);
+        });
+
+        timelineContainer.scrollIntoView({ behavior: 'smooth' });
+
+    } catch (err) {
+        console.error("Failed to load timeline:", err);
+        timelineSummary.innerHTML = '<p>Unable to load timeline.</p>';
+    }
+}
+
+
+// ---------------------------- END NEW TIMELINE ----------------------------
 
 // Draw charts
 function drawCharts(perUser,tabs,columns,selectedEmployee,isType){
-    const chartContainer=document.getElementById('multiChartContainer'); chartContainer.innerHTML=''; chartContainer.style.display='grid'; chartContainer.style.gridTemplateColumns='repeat(2,1fr)'; chartContainer.style.gap='20px';
+    const chartContainer=document.getElementById('multiChartContainer'); 
+    chartContainer.innerHTML=''; 
+    chartContainer.style.display='grid'; 
+    chartContainer.style.gridTemplateColumns='repeat(2,1fr)'; 
+    chartContainer.style.gap='20px';
     columns.forEach(col=>{
-        const chartWrapper=document.createElement('div'); chartWrapper.style.border='1px solid #ddd'; chartWrapper.style.borderRadius='6px'; chartWrapper.style.padding='10px'; chartWrapper.style.background='#fafafa'; chartWrapper.style.display='flex'; chartWrapper.style.flexDirection='column'; chartWrapper.style.alignItems='center';
-        const title=document.createElement('strong'); title.textContent=col; chartWrapper.appendChild(title);
-        const toggleWrapper=document.createElement('label'); toggleWrapper.style.fontSize='12px'; toggleWrapper.style.margin='5px 0'; toggleWrapper.innerHTML=`<input type="checkbox"> Show as %`; chartWrapper.appendChild(toggleWrapper);
+        const chartWrapper=document.createElement('div'); 
+        chartWrapper.style.border='1px solid #ddd'; 
+        chartWrapper.style.borderRadius='6px'; 
+        chartWrapper.style.padding='10px'; 
+        chartWrapper.style.background='#fafafa'; 
+        chartWrapper.style.display='flex'; 
+        chartWrapper.style.flexDirection='column'; 
+        chartWrapper.style.alignItems='center';
+        const title=document.createElement('strong'); 
+        title.textContent=col; 
+        chartWrapper.appendChild(title);
+        const toggleWrapper=document.createElement('label'); 
+        toggleWrapper.style.fontSize='12px'; 
+        toggleWrapper.style.margin='5px 0'; 
+        toggleWrapper.innerHTML=`<input type="checkbox"> Show as %`; 
+        chartWrapper.appendChild(toggleWrapper);
         const percentageCheckbox=toggleWrapper.querySelector('input');
-        const canvas=document.createElement('canvas'); canvas.style.width='100%'; canvas.style.height='260px'; chartWrapper.appendChild(canvas);
+        const canvas=document.createElement('canvas'); 
+        canvas.style.width='100%'; canvas.style.height='260px'; 
+        chartWrapper.appendChild(canvas);
         chartContainer.appendChild(chartWrapper);
         const renderChart=()=>{
             const labels=tabs;
             let data=tabs.map(tab=>{
-                if(selectedEmployee && !isType){ return STATE.fullSessions.filter(s=>s.session_id===col && s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0);}
-                else{ return perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0)||0;}
+                if(selectedEmployee && !isType) return STATE.fullSessions.filter(s=>s.session_id===col && s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0);
+                else return perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0)||0;
             });
             if(percentageCheckbox.checked){ const total=data.reduce((a,b)=>a+b,1); data=data.map(d=>(d/total*100).toFixed(2)); }
             renderBarChart(canvas,labels,data,COLORS.slice(0,labels.length),{
@@ -483,46 +733,9 @@ function drawCharts(perUser,tabs,columns,selectedEmployee,isType){
         renderChart();
     });
 }
-
-// Timeline
-async function loadTimeline(sessionId){
-    timelineContainer.style.display='block';
-    timelineSummary.innerHTML=timelineDiv.innerHTML=timelineLegend.innerHTML='';
-    Object.keys(colorMap).forEach(k=>delete colorMap[k]);
-    const response=await fetch(`/sessionTimeline?sessionId=${sessionId}`);
-    const data=await response.json();
-    if(!data.timeline?.length){ timelineSummary.innerHTML='<p>No events found for this session.</p>'; return; }
-    const totalDuration=data.totalDurationSeconds||1;
-    timelineSummary.innerHTML=`<div class="summary">
-      <strong>User:</strong> ${data.user_name}<br/>
-      <strong>Employee Type:</strong> ${data.employee_type}<br/>
-      <strong>Total Events:</strong> ${data.totalEvents}<br/>
-      <strong>Total Duration:</strong> ${Math.round(totalDuration)} seconds
-    </div>`;
-    const MIN_TOTAL_WIDTH=1200; const timelineTotalWidth=Math.max(data.timeline.length*50,MIN_TOTAL_WIDTH);
-    data.timeline.forEach(event=>{
-        const box=document.createElement('div'); box.className='event-box';
-        box.style.width=(event.durationSeconds/totalDuration)*timelineTotalWidth+'px';
-        box.style.background=getColor(event.event_type,event.payload);
-        box.title=`Event: ${event.event_type}\nDuration: ${Math.round(event.durationSeconds)} sec\nTime: ${new Date(event.time_stamp).toLocaleTimeString()}\nPayload: ${JSON.stringify(event.payload||{})}`;
-        timelineDiv.appendChild(box);
-    });
-    const grouped={};
-    Object.keys(colorMap).forEach(key=>{ const [type,payloadStr]=key.split(/-(.+)/); if(!grouped[type]) grouped[type]=[]; grouped[type].push({key,payloadStr,color: colorMap[key]}); });
-Object.keys(grouped).forEach(type=>{
-    const column=document.createElement('div'); column.className='legend-column';
-    const title=document.createElement('div'); title.className='legend-title'; title.innerText=type; column.appendChild(title);
-    grouped[type].forEach(item=>{
-        const itemDiv=document.createElement('div'); itemDiv.className='legend-item';
-        const colorBox=document.createElement('div'); colorBox.className='legend-color'; colorBox.style.background=item.color;
-        const label=document.createElement('span'); label.innerText=item.payloadStr==='null'?"No payload":item.payloadStr;
-        itemDiv.appendChild(colorBox); itemDiv.appendChild(label);
-        column.appendChild(itemDiv);
-    });
-    timelineLegend.appendChild(column);
-});
-timelineContainer.scrollIntoView({behavior:'smooth'});
-}
 </script>
+
+
+
 </body>
 </html>

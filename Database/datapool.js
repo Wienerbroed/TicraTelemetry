@@ -225,24 +225,38 @@ const sessionTimeline = async ({ sessionId }) => {
     .sort({ event_number: 1 })
     .toArray();
 
-  let totalDurationSeconds = 0;
+  if (!events.length) return { sessionId, user_name: "Unknown", employee_type: "Unknown", totalEvents: 0, totalDurationSeconds: 0, timeline: [] };
+
+  const firstTime = new Date(events[0].time_stamp);
+  const lastTime = new Date(events[events.length - 1].time_stamp);
+  const totalDurationSeconds = Math.max((lastTime - firstTime) / 1000, 1); // at least 1 second
 
   const timeline = events.map((current, i) => {
-    const next = events[i + 1];
-
+    // Find next Tabpage event
+    const nextTab = events.slice(i + 1).find(ev => ev.event_type === "Tabpage");
     let durationSeconds = 0;
-    if (next) {
-      durationSeconds = (new Date(next.time_stamp) - new Date(current.time_stamp)) / 1000;
-      totalDurationSeconds += durationSeconds;
+    let associatedTabEventNumber = null;
+
+    if (current.event_type === "Tabpage") {
+      if (nextTab) {
+        durationSeconds = (new Date(nextTab.time_stamp) - new Date(current.time_stamp)) / 1000;
+      } else if (i < events.length - 1) {
+        durationSeconds = (new Date(events[events.length - 1].time_stamp) - new Date(current.time_stamp)) / 1000;
+      } else {
+        durationSeconds = 1;
+      }
+      associatedTabEventNumber = current.event_number;
+    } else {
+      // Non-Tabpage events attach to last preceding Tabpage
+      associatedTabEventNumber = events.slice(0, i + 1).reverse().find(ev => ev.event_type === "Tabpage")?.event_number ?? null;
     }
 
-    // Extract last payload value only
+    // Extract last payload value
     let lastPayload = null;
     if (current.payload && typeof current.payload === "object") {
       const entries = Object.entries(current.payload);
       if (entries.length > 0) {
         const [, value] = entries[entries.length - 1];
-        // If value is an object with a single key "selected tab", just take its value
         if (value && typeof value === "object" && Object.keys(value).length === 1) {
           lastPayload = Object.values(value)[0];
         } else {
@@ -257,9 +271,12 @@ const sessionTimeline = async ({ sessionId }) => {
       payload: lastPayload,
       time_stamp: current.time_stamp,
       durationSeconds,
-      isLastEvent: !next
+      associatedTabEventNumber,
+      isLastEvent: false
     };
   });
+
+  if (timeline.length) timeline[timeline.length - 1].isLastEvent = true;
 
   return {
     sessionId,
@@ -270,8 +287,5 @@ const sessionTimeline = async ({ sessionId }) => {
     timeline
   };
 };
-
-
-
 
 export { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline };

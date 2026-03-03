@@ -18,14 +18,14 @@
   border-radius: 6px;
   padding: 8px;
   font-size: 12px;
-  max-width: 220px;
+  max-width: 500px;
   z-index: 9999;
   display: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 .tooltip img {
-  max-width: 200px;
-  max-height: 120px;
+  max-width: 500px;
+  max-height: 300px;
   display: block;
   margin-top: 4px;
 }
@@ -48,6 +48,12 @@
     <strong>Date interval:</strong>
     <label>Start date: <input type="date" id="startDate"></label>
     <label>End date: <input type="date" id="endDate"></label>
+
+    
+      <button type="button" class="preset-btn" data-range="10">Last 10 days</button>
+      <button type="button" class="preset-btn" data-range="30">Last 1 month</button>
+      <button type="button" class="preset-btn" data-range="all">All time</button>
+    
   </div>
 
   <div>
@@ -128,6 +134,44 @@ function getCheckedEmployeeTypes(){
 function getCheckedValues(containerId){
   return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(i=>i.value);
 }
+
+function formatDate(date) {
+  return date.toISOString().split('T')[0];
+}
+
+function setPresetRange(range) {
+  const startInput = document.getElementById('startDate');
+  const endInput = document.getElementById('endDate');
+
+  const today = new Date();
+
+  if (range === 'all') {
+    const fixedStart = new Date('2026-01-01');
+    startInput.value = formatDate(fixedStart);
+    endInput.value = formatDate(today);
+    return;
+  }
+
+  const past = new Date();
+
+  if (range === 30) {
+    past.setMonth(today.getMonth() - 1); 
+  } else {
+    past.setDate(today.getDate() - range);
+  }
+
+  startInput.value = formatDate(past);
+  endInput.value = formatDate(today);
+}
+
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const range = btn.dataset.range;
+    setPresetRange(range === 'all' ? 'all' : parseInt(range));
+  });
+});
+
 
 // APPLY BUTTON
 document.getElementById('applyButton').addEventListener('click', async () => {
@@ -254,39 +298,49 @@ async function drawTable(perUser, selections) {
       // ----------------------
       // TOOLTIP
       // ----------------------
-      opCell.addEventListener('mouseenter', () => {
-        tooltip.innerHTML = ''; 
-        tooltip.style.display = 'block';
+opCell.addEventListener('mouseenter', (e) => {
+    tooltip.innerHTML = ''; 
+    tooltip.style.display = 'block';
 
-        if (eventType) {
-          const titleP = document.createElement('p');
-          titleP.textContent = eventType;
-          titleP.style.fontWeight = 'bold';
-          titleP.style.margin = '0 0 4px 0';
-          tooltip.appendChild(titleP);
-        }
+    if (eventType) {
+        const titleP = document.createElement('p');
+        titleP.textContent = eventType;
+        titleP.style.fontWeight = 'bold';
+        tooltip.appendChild(titleP);
+    }
 
-        if (description) { 
-          const p = document.createElement('p'); 
-          p.textContent = description; 
-          p.style.margin = '0 0 4px 0'; 
-          tooltip.appendChild(p); 
-        }
-        if (imgSrc) { 
-          const img = document.createElement('img'); 
-          img.src = imgSrc; 
-          tooltip.appendChild(img); 
-        }
-        const selP = document.createElement('p'); 
-        selP.textContent = displayName; 
-        selP.style.margin = '4px 0 0 0'; 
-        tooltip.appendChild(selP);
+    if (description) { 
+        const p = document.createElement('p'); 
+        p.textContent = description; 
+        tooltip.appendChild(p); 
+    }
+    if (imgSrc) { 
+        const img = document.createElement('img'); 
+        img.src = imgSrc; 
+        tooltip.appendChild(img); 
+    }
+    const selP = document.createElement('p'); 
+    selP.textContent = displayName; 
+    tooltip.appendChild(selP);
 
-        const rect = opCell.getBoundingClientRect();
-        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 6 + window.scrollY}px`;
-        tooltip.style.left = `${rect.right - tooltip.offsetWidth + window.scrollX}px`;
-      });
-      opCell.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    
+    
+    const offsetY = 10; 
+    tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
+    tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 10}px`;
+});
+
+opCell.addEventListener('mousemove', (e) => {
+    
+    const offsetY = 10;
+    tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
+    tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 100}px`;
+});
+
+opCell.addEventListener('mouseleave', () => { 
+    tooltip.style.display = 'none'; 
+});
+
 
       // ----------------------
       // SUMMARY CELLS
