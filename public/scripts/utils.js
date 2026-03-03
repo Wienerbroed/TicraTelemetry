@@ -308,8 +308,11 @@ export function createRotatedHeader(text, sticky=false, isUser=false){
     return th;
 }
 
+// ---------------- HEATMAP GRADIENT ----------------
 export function applyColumnHeatmap(table){
     const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
     const rows = Array.from(tbody.querySelectorAll('tr'));
     if (!rows.length) return;
 
@@ -324,36 +327,28 @@ export function applyColumnHeatmap(table){
         }
     }
 
-    // Loop through each user column
+    // Apply gradient heatmap per user column
     for (let col = firstUserColIndex; col < headerCells.length; col++) {
-        // Compute columnMax and columnSecondMax based on dataset.sort if present
-        const columnValues = rows.map(r => {
-            const td = r.children[col];
-            return parseFloat(td.dataset.sort ?? td.textContent) || 0;
-        });
-
+        const columnValues = rows.map(r => parseFloat(r.children[col].dataset.sort ?? r.children[col].textContent) || 0);
         const maxVal = Math.max(...columnValues);
-        let secondVal = columnValues
-            .filter(v => v < maxVal)
-            .reduce((prev, curr) => Math.max(prev, curr), 0);
+        if(maxVal === 0) continue;
 
-        // Apply threshold: second highest only if >= 50% of max
-        if (secondVal < maxVal / 2) secondVal = 0;
-
-        rows.forEach(r => {
+        rows.forEach((r, rowIndex) => {
             const td = r.children[col];
             const val = parseFloat(td.dataset.sort ?? td.textContent) || 0;
 
-            td.classList.remove('heatmap-max','heatmap-second');
+            // Exponential scaling factor between 0 and 1
+            const intensity = Math.pow(val / maxVal, 0.5); // 0.5 = square root for mild exponential
 
-            if (val === maxVal && maxVal > 0) {
-                td.classList.add('heatmap-max'); // dark green
-            } else if (val === secondVal && secondVal > 0) {
-                td.classList.add('heatmap-second'); // light green
-            }
+            // Convert intensity to HSL green gradient (0=white, 1=green)
+            const hue = 120; // green
+            const lightness = 100 - intensity * 60; // from white(100%) to dark green(40%)
+            td.style.backgroundColor = `hsl(${hue}, 70%, ${lightness}%)`;
+            td.style.color = intensity > 0.6 ? '#fff' : '#000';
         });
     }
 }
+
 
 
 

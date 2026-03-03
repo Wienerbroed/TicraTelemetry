@@ -115,6 +115,29 @@ footer {
   table-layout: fixed;
 }
 
+/* LEFT ALIGN ONLY OPERATION CELLS */
+#bigTable td.operation-cell {
+    text-align: left !important;
+    padding-left: 8px;             
+    font-size: 12px;
+    max-width: 15ch;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
+    border-right: 2px solid #555;
+    border-bottom: 2px solid #555;
+}
+
+/* KEEP HEADER FIRST CELL CENTERED */
+#bigTable th:first-child div {
+    text-align: center !important;
+    font-size: 12px;
+    white-space: nowrap;
+    text-align: center;
+    background-color: inherit;
+}
+
+
 th, td {
   padding: 2px;
   font-size: 12px;
@@ -144,7 +167,6 @@ td:first-child {
 thead th {
   position: sticky;
   top: 0;
-  background-color: #eeeeee;
   z-index: 300;
   cursor: pointer;
 }
@@ -192,12 +214,19 @@ th.sticky {
 
 /* Alternate only NON-summary cells */
 
-tr.eventtype-row-white > td:not(.summary-cell) {
-  background-color: white;
+/* White rows */
+tr.eventtype-white td.operation-cell {
+    background-color: #ffffff !important;
 }
 
-tr.eventtype-row-gray > td:not(.summary-cell) {
-  background-color: #dcdcdc;
+tr.eventtype-grey td.operation-cell {
+    background-color: #dcdcdc !important;
+}
+
+/* Preserve hover highlight */
+tr.sortable:hover td.operation-cell {
+    background-color: rgba(252, 199, 93, 0.5) !important;
+    font-weight: bold;
 }
 
 
@@ -208,7 +237,7 @@ tr.eventtype-row-gray > td:not(.summary-cell) {
 
 td.summary-cell {
   background-color: #dbeeff !important;
-  font-weight: bold;
+  
 }
 
 
@@ -232,10 +261,19 @@ td.heatmap-second {
    ROW HOVER EFFECT
 ========================= */
 
-tr.sortable:hover td:not(.sticky) {
-  background-color: rgba(252, 199, 93, 0.5);
-  cursor: pointer;
+td.user-cell {
+    background-color: var(--cell-bg, white);
+    transition: background-color 0.2s;
 }
+
+/* Hover on the row */
+/* Highlight first column AND summary cells */
+tr.sortable:hover td.operation-cell,
+tr.sortable:hover td.summary-cell {
+    background-color: rgba(252, 199, 93, 0.5) !important;
+    font-weight: bold;
+}
+
 
 
 /* =========================

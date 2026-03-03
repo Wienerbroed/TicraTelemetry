@@ -1,85 +1,140 @@
-//////////////////////////////////////////////// setup ////////////////////////////////////////////////
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { readFile } from "fs/promises";
-import { connectDB } from "./db.js";
-import { timeIntervalFilter, employeeTypeFilter } from "./db.js";
+import { connectDB, timeIntervalFilter } from "./db.js";
+import { getRawConfig } from "./configManager.js";
 
-// setup for json import
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const poolConfigPath = join(__dirname, "./config/queries.json");
-const sessionConfigPath = join(__dirname, "./config/sessions.json");
-
-// Database logic
 const database = await connectDB();
-const dbCollection = database.collection('gui_event');
+const dbCollection = database.collection("gui_event");
 
-//////////////////////////////////////////////// Helper functions ////////////////////////////////////////////////
-const buildEventQueryConfig = async ({ inputEventType, startTime, endTime, employeeType }) => {
+////////////////////////////////////////////////
+//////////////// EVENT POOL FETCH //////////////
+////////////////////////////////////////////////
+
+const fetchDataPoolByQueries = async ({
+  inputEventType,
+  startTime,
+  endTime,
+  employeeType
+} = {}) => {
+  if (!inputEventType)
+    throw new Error("inputEventType (resolved event_type) is required");
+
+  if (!startTime || !endTime)
+    throw new Error("startTime and endTime are required");
+
+  const matchFilter = {
+    event_type: inputEventType,
+    ...timeIntervalFilter(startTime, endTime)
+  };
+
+  if (employeeType) {
+    if (Array.isArray(employeeType)) {
+      matchFilter.employee_type = { $in: employeeType };
+    } else {
+      matchFilter.employee_type = employeeType;
+    }
+  }
+
+  const pipeline = [
+    { $match: matchFilter },
+
+    // Extract last payload key/value
+    {
+      $addFields: {
+        lastPayloadPair: {
+          $cond: [
+            {
+              $and: [
+                { $ne: ["$payload", null] },
+                { $eq: [{ $type: "$payload" }, "object"] }
+              ]
+            },
+            { $arrayElemAt: [{ $objectToArray: "$payload" }, -1] },
+            null
+          ]
+        }
+      }
+    },
+
+    {
+      $group: {
+        _id: {
+          user_name: "$user_name",
+          event_type: "$event_type",
+          employee_type: "$employee_type",
+          payload_value: "$lastPayloadPair.v"
+        },
+        count: { $sum: 1 }
+      }
+    },
+
+    {
+      $project: {
+        _id: 0,
+        user_name: "$_id.user_name",
+        event_type: "$_id.event_type",
+        employee_type: "$_id.employee_type",
+        payload: {
+          $cond: [
+            { $ifNull: ["$_id.payload_value", false] },
+            { value: "$_id.payload_value" },
+            {}
+          ]
+        },
+        count: 1
+      }
+    }
+  ];
+
+  const events = await dbCollection.aggregate(pipeline).toArray();
+
+  return {
+    meta: {
+      event_type: inputEventType,
+      count: events.length
+    },
+    events
+  };
+};
+
+////////////////////////////////////////////////
+//////////////// SESSION FETCH //////////////////
+////////////////////////////////////////////////
+
+const sessionFetchByQueries = async ({
+  configTitle,
+  inputEventType,
+  startTime,
+  endTime,
+  user_name,
+  employee_type
+} = {}) => {
   if (!inputEventType) throw new Error("inputEventType is required");
   if (!startTime || !endTime) throw new Error("startTime and endTime are required");
 
-  const data = await readFile(poolConfigPath, "utf-8");
-  const config = JSON.parse(data);
-  const eventConfig = config[inputEventType];
-  if (!eventConfig) throw new Error(`Event type "${inputEventType}" not found in config`);
+  const config = await getRawConfig(configTitle);
+  if (!config) throw new Error("Config not found");
 
-  const payloadFields = Object.keys(eventConfig.fields).filter(f => f.startsWith("payload."));
-  if (payloadFields.length === 0) throw new Error("No payload fields configured for this event");
+  const payloadField = Array.isArray(config.payload_field)
+    ? config.payload_field[0]
+    : config.payload_field;
 
-  const payloadField = payloadFields[0];
-  const payloadKey = payloadField.split(".").pop();
-
+  // Build DB query
   const matchFilter = {
-    ...eventConfig.query,
-    ...timeIntervalFilter(startTime, endTime),
-    ...employeeTypeFilter(employeeType)
+    event_type: inputEventType,
+    ...timeIntervalFilter(startTime, endTime)
   };
-
-  return { payloadField, payloadKey, matchFilter };
-};
-
-const getSessionConfig = async (inputEventType) => {
-  if (!inputEventType) throw new Error("inputEventType is required");
-
-  const data = await readFile(sessionConfigPath, "utf-8");
-  const config = JSON.parse(data);
-  const eventConfig = config[inputEventType];
-  if (!eventConfig) throw new Error(`Event type "${inputEventType}" not found in session config`);
-
-  const payloadFields = Object.keys(eventConfig.fields).filter(f => f.startsWith("payload."));
-  if (payloadFields.length === 0) throw new Error("No payload fields configured for this event");
-
-  const payloadField = payloadFields[0];
-  const [payloadObj, payloadKey] = payloadField.split(".");
-  return { eventConfig, payloadObj, payloadKey };
-};
-
-const buildSessionMatchFilter = ({ eventConfig, startTime, endTime, user_name, employee_type }) => {
-  if (!startTime || !endTime) throw new Error("startTime and endTime are required");
-
-  const matchFilter = {
-    ...eventConfig.query,
-    ...timeIntervalFilter(startTime, endTime),
-  };
-
   if (user_name) matchFilter.user_name = user_name;
   if (employee_type) matchFilter.employee_type = employee_type;
 
-  return matchFilter;
-};
+  const events = await dbCollection.find(matchFilter).sort({ time_stamp: 1 }).toArray();
 
-const groupEventsBySession = (events) => {
-  return events.reduce((acc, event) => {
-    const key = `${event.user_name}_${event.session_id}`;
+  // Group events by session
+  const groupedSessions = events.reduce((acc, ev) => {
+    const key = ev.session_id;
     if (!acc[key]) acc[key] = [];
-    acc[key].push(event);
+    acc[key].push(ev);
     return acc;
   }, {});
-};
 
-const aggregateSessions = (groupedSessions, payloadObj, payloadKey, startTime, endTime) => {
   const sessionResults = [];
   const employeeTabTotals = {};
   const employeeSessionCounts = {};
@@ -92,6 +147,7 @@ const aggregateSessions = (groupedSessions, payloadObj, payloadKey, startTime, e
 
     const user = sessionEvents[0].user_name;
     const sessionId = sessionEvents[0].session_id;
+
     employeeSessionCounts[user] = (employeeSessionCounts[user] || 0) + 1;
 
     sessionEvents.sort((a, b) => a.event_number - b.event_number);
@@ -100,10 +156,17 @@ const aggregateSessions = (groupedSessions, payloadObj, payloadKey, startTime, e
       const current = sessionEvents[i];
       const next = sessionEvents[i + 1];
 
-      const currentTab = current[payloadObj]?.[payloadKey] || "Unknown";
+      // Extract payload value as string
+      let tab = "Unknown";
+      if (current.payload && typeof current.payload === "object") {
+        const val = current.payload[payloadField];
+        if (val !== undefined && val !== null) tab = String(val);
+      }
 
       let currentStart = new Date(current.time_stamp);
-      let currentEnd = next && next.session_id === sessionId ? new Date(next.time_stamp) : new Date(current.time_stamp);
+      let currentEnd = next && next.session_id === sessionId
+        ? new Date(next.time_stamp)
+        : new Date(current.time_stamp);
 
       // Clamp to query interval
       if (currentEnd < rangeStart) continue;
@@ -117,7 +180,7 @@ const aggregateSessions = (groupedSessions, payloadObj, payloadKey, startTime, e
       sessionResults.push({
         user_name: user,
         session_id: sessionId,
-        tab: currentTab,
+        tab,
         start_time: currentStart.toISOString(),
         end_time: currentEnd.toISOString(),
         durationSeconds,
@@ -125,101 +188,23 @@ const aggregateSessions = (groupedSessions, payloadObj, payloadKey, startTime, e
       });
 
       if (!employeeTabTotals[user]) employeeTabTotals[user] = {};
-      employeeTabTotals[user][currentTab] = (employeeTabTotals[user][currentTab] || 0) + durationSeconds;
+      employeeTabTotals[user][tab] = (employeeTabTotals[user][tab] || 0) + durationSeconds;
     }
   }
 
-  return { sessionResults, employeeTabTotals, employeeSessionCounts };
-};
-
-const calculateEmployeeStats = (employeeTabTotals, employeeSessionCounts) => {
+  // Calculate totals and averages per employee
   const totalsPerEmployee = {};
   const averagesPerEmployee = {};
-
   for (const [user, tabTotals] of Object.entries(employeeTabTotals)) {
     totalsPerEmployee[user] = {};
     averagesPerEmployee[user] = {};
-
     const sessionCount = employeeSessionCounts[user] || 1;
 
-    for (const [tab, totalSeconds] of Object.entries(tabTotals)) {
-      totalsPerEmployee[user][tab] = totalSeconds;
-      averagesPerEmployee[user][tab] = totalSeconds / sessionCount;
+    for (const [tab, total] of Object.entries(tabTotals)) {
+      totalsPerEmployee[user][tab] = total;
+      averagesPerEmployee[user][tab] = total / sessionCount;
     }
   }
-
-  return { totalsPerEmployee, averagesPerEmployee };
-};
-
-//////////////////////////////////////////////// Functions ////////////////////////////////////////////////
-const fetchDataPoolByQueries = async ({ inputEventType, startTime, endTime, employeeType } = {}) => {
-  if (!startTime || !endTime) throw new Error("startTime and endTime are required");
-
-  const { payloadField, payloadKey, matchFilter } = await buildEventQueryConfig({ inputEventType, startTime, endTime, employeeType });
-
-  const pipeline = [
-    { $match: matchFilter },
-    {
-      $group: {
-        _id: {
-          user_name: "$user_name",
-          event_type: "$event_type",
-          employee_type: "$employee_type",
-          payload_value: `$${payloadField}`
-        },
-        count: { $sum: 1 }
-      }
-    },
-    {
-      $project: {
-        _id: 0,
-        user_name: "$_id.user_name",
-        event_type: "$_id.event_type",
-        employee_type: "$_id.employee_type",
-        payload: { [payloadKey]: "$_id.payload_value" },
-        count: 1
-      }
-    }
-  ];
-
-  const events = await dbCollection.aggregate(pipeline).toArray();
-  return { meta: { inputEventType, count: events.length }, events };
-};
-
-
-//////////////////////////////////////////////// Functions ////////////////////////////////////////////////
-const sessionFetchByQueries = async ({ eventType, startTime, endTime, user_name, employee_type } = {}) => {
-  if (!eventType) throw new Error("eventType is required");
-  if (!startTime || !endTime) throw new Error("startTime and endTime are required");
-
-  // Get session config
-  const { eventConfig, payloadObj, payloadKey } = await getSessionConfig(eventType);
-
-  // Build DB query
-  const matchFilter = buildSessionMatchFilter({
-    eventConfig,
-    startTime,
-    endTime,
-    user_name,
-    employee_type
-  });
-
-  // Fetch events from DB
-  const events = await dbCollection
-    .find(matchFilter)
-    .sort({ time_stamp: 1 })
-    .toArray();
-
-  // Group events by session
-  const groupedSessions = groupEventsBySession(events);
-
-  // Use aggregateSessions helper to handle clamping, totals, averages
-  const { sessionResults, employeeTabTotals, employeeSessionCounts } =
-    aggregateSessions(groupedSessions, payloadObj, payloadKey, startTime, endTime);
-
-  // Calculate per-employee stats
-  const { totalsPerEmployee, averagesPerEmployee } =
-    calculateEmployeeStats(employeeTabTotals, employeeSessionCounts);
 
   return {
     sessions: sessionResults,
@@ -228,37 +213,55 @@ const sessionFetchByQueries = async ({ eventType, startTime, endTime, user_name,
   };
 };
 
+////////////////////////////////////////////////
+//////////////// SESSION TIMELINE //////////////
+////////////////////////////////////////////////
 
-const sessionTimeline = async ({ sessionId } = {}) => {
-  if (!sessionId) throw new Error("Session id required");
+const sessionTimeline = async ({ sessionId }) => {
+  if (!sessionId) throw new Error("sessionId is required");
 
   const events = await dbCollection
     .find({ session_id: sessionId })
     .sort({ event_number: 1 })
     .toArray();
 
-  if (!events.length) {
-    return { sessionId, totalEvents: 0, timeline: [] };
-  }
+  if (!events.length) return { sessionId, user_name: "Unknown", employee_type: "Unknown", totalEvents: 0, totalDurationSeconds: 0, timeline: [] };
 
-  let totalDurationSeconds = 0;
+  const firstTime = new Date(events[0].time_stamp);
+  const lastTime = new Date(events[events.length - 1].time_stamp);
+  const totalDurationSeconds = Math.max((lastTime - firstTime) / 1000, 1); // at least 1 second
 
   const timeline = events.map((current, i) => {
-    const next = events[i + 1];
-
+    // Find next Tabpage event
+    const nextTab = events.slice(i + 1).find(ev => ev.event_type === "Tabpage");
     let durationSeconds = 0;
-    if (next) {
-      durationSeconds =
-        (new Date(next.time_stamp) - new Date(current.time_stamp)) / 1000;
-      totalDurationSeconds += durationSeconds;
+    let associatedTabEventNumber = null;
+
+    if (current.event_type === "Tabpage") {
+      if (nextTab) {
+        durationSeconds = (new Date(nextTab.time_stamp) - new Date(current.time_stamp)) / 1000;
+      } else if (i < events.length - 1) {
+        durationSeconds = (new Date(events[events.length - 1].time_stamp) - new Date(current.time_stamp)) / 1000;
+      } else {
+        durationSeconds = 1;
+      }
+      associatedTabEventNumber = current.event_number;
+    } else {
+      // Non-Tabpage events attach to last preceding Tabpage
+      associatedTabEventNumber = events.slice(0, i + 1).reverse().find(ev => ev.event_type === "Tabpage")?.event_number ?? null;
     }
 
+    // Extract last payload value
     let lastPayload = null;
     if (current.payload && typeof current.payload === "object") {
-      const keys = Object.keys(current.payload);
-      if (keys.length) {
-        const lastKey = keys[keys.length - 1];
-        lastPayload = { [lastKey]: current.payload[lastKey] };
+      const entries = Object.entries(current.payload);
+      if (entries.length > 0) {
+        const [, value] = entries[entries.length - 1];
+        if (value && typeof value === "object" && Object.keys(value).length === 1) {
+          lastPayload = Object.values(value)[0];
+        } else {
+          lastPayload = value;
+        }
       }
     }
 
@@ -268,19 +271,21 @@ const sessionTimeline = async ({ sessionId } = {}) => {
       payload: lastPayload,
       time_stamp: current.time_stamp,
       durationSeconds,
-      isLastEvent: !next
+      associatedTabEventNumber,
+      isLastEvent: false
     };
   });
 
+  if (timeline.length) timeline[timeline.length - 1].isLastEvent = true;
+
   return {
     sessionId,
-    user_name: events[0].user_name,
-    employee_type: events[0].employee_type,
+    user_name: events[0]?.user_name || "Unknown",
+    employee_type: events[0]?.employee_type || "Unknown",
     totalEvents: events.length,
     totalDurationSeconds,
     timeline
   };
 };
-
 
 export { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline };
