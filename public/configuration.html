@@ -273,7 +273,18 @@ document.getElementById("createConfig").addEventListener("click", async ()=>{
   formData.append("description", description);
   if(imageInput.files[0]) formData.append("image", imageInput.files[0]);
 
-  await fetch("/api/configs", { method:"POST", body: formData });
+  const response = await fetch("/api/configs", {
+    method: "POST",
+    body: formData
+  });
+
+const result = await response.json();
+
+if (!response.ok) {
+  alert(result.error);
+  return;
+}
+
 
   document.getElementById("newTitle").value="";
   document.getElementById("newPayload").value="";

@@ -1,95 +1,76 @@
 import { MongoClient } from 'mongodb';
 
-
-// Enviromental variables
+// Environmental variables
 const username = encodeURIComponent(process.env.MONGO_USER);
-const writeUsername = encodeURIComponent(process.env.MONGO_WRITE_USER)
+const writeUsername = encodeURIComponent(process.env.MONGO_WRITE_USER);
 const password = encodeURIComponent(process.env.MONGO_PASSWORD);
-const writePassword = encodeURIComponent(process.env.MONGO_WRITE_PASSWORD)
+const writePassword = encodeURIComponent(process.env.MONGO_WRITE_PASSWORD);
 const dbUrl = encodeURIComponent(process.env.MONGODB_URL);
 
-
-// Database URL
+// Database URLs
 const uri = `mongodb+srv://${username}:${password}@${dbUrl}/?retryWrites=true&w=majority`;
 const writeUrl = `mongodb+srv://${writeUsername}:${writePassword}@${dbUrl}/?retryWrites=true&w=majority`;
 
-// Attributes
-let client;
-let db;
+// Separate clients and DB instances
+let readClient;
+let readDB;
 
+let writeClient;
+let writeDB;
 
-// Connect to Mongodb
+// ================= READ CONNECTION =================
 const connectDB = async () => {
-  if (db) {
-    return db;
-  }
+  if (readDB) return readDB;
 
   try {
-    // Set client to database
-    client = new MongoClient(uri);
+    readClient = new MongoClient(uri);
+    await readClient.connect();
+    readDB = readClient.db('gui_event_db');
 
-    // Check connction
-    await client.connect();
-
-    // Sets db
-    db = client.db('gui_event_db');
-    console.log('MongoDB Atlas connected');
-
-    return db;
-
+    console.log('✅ Read DB connected');
+    return readDB;
   } catch (err) {
-    console.error('MongoDB connection failed:', err.message);
+    console.error('❌ Read DB connection failed:', err.message);
     process.exit(1);
   }
 };
 
+// ================= WRITE CONNECTION =================
 const connectConfigDB = async () => {
-  if (db) {
-    return db;
-  }
+  if (writeDB) return writeDB;
 
   try {
-    // Set client to database
-    client = new MongoClient(writeUrl);
+    writeClient = new MongoClient(writeUrl);
+    await writeClient.connect();
+    writeDB = writeClient.db('gui_event_db');
 
-    // Check connction
-    await client.connect();
-
-    // Sets db
-    db = client.db('gui_event_db');
-    console.log('MongoDB Atlas connected');
-
-    return db;
-
+    console.log('✅ Write DB connected');
+    return writeDB;
   } catch (err) {
-    console.error('MongoDB connection failed:', err.message);
+    console.error('❌ Write DB connection failed:', err.message);
     process.exit(1);
   }
 };
 
-
+// ================= FILTERS =================
 const timeIntervalFilter = (start, end) => {
   if (!start && !end) return {};
 
   const filter = {};
-
-  // sets start date with mongoDb query
   if (start) filter.$gte = start;
-  
-  // sets end date with mongoDb query
   if (end) filter.$lte = end;
-  
+
   return { time_stamp: filter };
 };
 
-
 const employeeTypeFilter = employeeType => {
-
   if (!employeeType) return {};
-  
   return { employee_type: employeeType };
 };
 
-
-
-export { connectDB, timeIntervalFilter, employeeTypeFilter, connectConfigDB };
+export {
+  connectDB,
+  connectConfigDB,
+  timeIntervalFilter,
+  employeeTypeFilter
+};
