@@ -4,166 +4,10 @@
 <meta charset="UTF-8">
 <title>Session Viewer</title>
 <link rel="stylesheet" href="styles/styles.css">
+<link rel="stylesheet" href="styles/session.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
 <style>
-/* Timeline styles */
-.timeline-wrapper {
-    margin-top: 120px;        
-    width: 100%;
-    max-width: 1200px;
-    overflow-x: auto;
-    border-top: 3px solid #ccc;
-    padding-top: 120px;       
-    position: relative;
-    justify-content: flex-start;
-}
-
-.timeline {
-    display: flex;
-    align-items: flex-start;
-    height: 80px;
-    min-width: 800px;
-    width: max-content;
-}
-.event-box { 
-    display:flex; 
-    align-items:center; 
-    justify-content:center; 
-    height:60px; 
-    color:white; 
-    font-size:12px; 
-    border-radius:6px; 
-    margin-right:2px; 
-    cursor:pointer; 
-    white-space:nowrap; 
-    overflow:hidden; 
-    text-overflow:ellipsis; 
-    transition:opacity 0.2s;
-}
-.event-box:hover { opacity:0.85; }
-
-#timelineSummary { text-align: left; margin-bottom: 15px; }
-
-#timelineLegend {
-    display: flex;            
-    gap: 40px;                 
-    align-items: flex-start;   
-}
-
-.legend-column {
-    display: flex;
-    flex-direction: column;    
-    align-items: flex-start;   
-    gap: 6px;
-}
-
-.legend-title {
-    font-weight: bold;
-    margin-bottom: 6px;
-}
-
-.legend-item {
-    display: flex;             
-    align-items: center;       
-    gap: 6px;                
-}
-
-.legend-color {
-    width: 15px;
-    height: 15px;
-    border-radius: 3px;
-    flex-shrink: 0;            
-}
-
-.legend-text {
-    font-size: 13px;
-    text-align: left;
-}
-
-.legend { margin-top:25px; display:flex; gap:40px; }
-
-
-.tooltip {
-  position: absolute;         /* important */
-  background: rgba(255,255,255,0.95);
-  border: 1px solid #aaa;
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 12px;
-  max-width: 300px;
-  z-index: 9999;
-  display: none;              /* hidden by default */
-  pointer-events: none;       /* so it doesn’t block hover */
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-}
-.tooltip img {
-  max-width: 300px;
-  max-height: 200px;
-  display: block;
-  margin-top: 4px;
-}
-
-
-#tableContainerWrapper {
-    margin-top: 20px;
-    text-align: center; 
-}
-#downloadBtn {
-    cursor: pointer;
-    opacity: 0.8;
-    margin-top: 10px;
-    display: none;
-    transition: opacity 0.2s;
-}
-#downloadBtn:hover {
-    opacity: 1;
-}
-
-
-.event-marker {
-    position: absolute;
-    top: 0;
-    width: 4px;
-    height: 100%;
-    border-radius: 2px;
-}
-
-.timeline-container { position: relative; }
-.event-box {
-    display: inline-block;
-    height: 40px;
-    position: relative;
-    margin-right: 2px;
-    border-radius: 4px;
-}
-.tabpage-text {
-    color: #fff;
-    font-size: 12px;
-    text-align: center;
-    word-break: break-word;
-    position: absolute;
-    width: 100%;
-    top: 50%;
-    transform: translateY(-50%);
-}
-.event-line {
-    width: 2px;
-    position: absolute;
-}
-
-.event-label {
-    position: absolute;
-    top: -15px; 
-    left: -10px;
-    transform: rotate(-45deg);
-    font-size: 10px;
-    white-space: nowrap;
-    color: #000;
-}
-
-
-
 
 </style>
 </head>
@@ -230,6 +74,11 @@
   <div class="timeline-wrapper">
     <div id="timeline" class="timeline"></div>
   </div>
+    <div style="margin-bottom:10px;">
+        <button id="zoomOutBtn">- Zoom Out</button>
+        <button id="zoomInBtn">+ Zoom In</button>
+        <button id="zoomResetBtn">Reset Zoom</button>
+    </div>
   <div id="timelineLegend" class="legend"></div>
 </div>
 
@@ -262,6 +111,8 @@ downloadBtn.innerHTML = '<img src="/images/Excel-Logo.png" alt="Excel" width="10
 downloadBtn.title = 'Download CSV';
 downloadBtn.addEventListener('click', () => { downloadTableCSV(); });
 document.getElementById('tableContainerWrapper').appendChild(downloadBtn);
+
+
 
 // Initialize default date range
 setDefaultDateRange('startTime','endTime',10);
@@ -319,7 +170,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     });
 });
 
-// Tooltip function (only table row tooltips)
+// Tooltip function
 async function loadDescriptionTooltip(configTitle) {
     if (!configTitle) return;
     try {
@@ -399,115 +250,162 @@ function toggleDownloadButton(show){ downloadBtn.style.display=show?'block':'non
 const colorMap={};
 function getColor(eventType,payload){ const key=payload?`${eventType}-${JSON.stringify(payload)}`:`${eventType}-null`; if(!colorMap[key]){ const hue=(Object.keys(colorMap).length*100)%360; colorMap[key]=payload?`hsl(${hue},50%,40%)`:"#888"; } return colorMap[key]; }
 
-// Draw table
-function drawTable(perUser, tabs, selectedEmployee, isType) {
-    const table = document.getElementById('bigTable');
-    const thead = table.querySelector('thead');
-    const tbody = table.querySelector('tbody');
-    thead.innerHTML = '';
-    tbody.innerHTML = '';
+// ---------------------------- DRAW TABLE ----------------------------
+async function drawTable(perUser, tabs, selectedEmployee, isType) {
+  const table = document.getElementById('bigTable');
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
 
-    let columns = [];
-    if (selectedEmployee && !isType) columns = [...new Set(STATE.fullSessions.map(s => s.session_id))].sort();
-    else columns = STATE.userOrder;
+  const columns = (selectedEmployee && !isType)
+    ? [...new Set(STATE.fullSessions.map(s => s.session_id))].sort()
+    : STATE.userOrder;
 
-    const headerRow = document.createElement('tr');
-    ['Operation', 'AVERAGE', 'TOTAL', ...columns].forEach((text, idx) => {
-        const th = document.createElement('th');
-        th.classList.add('rotate', 'sticky');
-        if (idx === 0) th.style.position = 'relative';
+  // Build table header
+  const headerRow = document.createElement('tr');
+  ['Operation', 'AVERAGE', 'TOTAL', ...columns].forEach((text, idx) => {
+    const th = document.createElement('th');
+    th.classList.add('rotate', 'sticky');
+    if (idx === 0) th.style.position = 'relative';
 
-        let displayText = text;
-        let sessionIdForClick = text;
+    let displayText = text;
+    let sessionIdForClick = text;
 
-        if (selectedEmployee && !isType && idx >= 3) {
-            const sessionEvents = STATE.fullSessions.filter(s => s.session_id === text);
-            if (sessionEvents.length) {
-                displayText = new Date(sessionEvents[0].start_time).toLocaleString();
-                sessionIdForClick = sessionEvents[0].session_id;
-            }
-        }
-
-        const div = document.createElement('div');
-        div.textContent = displayText;
-
-        if (selectedEmployee && !isType && idx >= 3) {
-            div.style.cursor = "pointer";
-            div.style.textDecoration = "underline";
-            div.addEventListener('click', () => loadTimeline(sessionIdForClick));
-        }
-
-        th.appendChild(div);
-        if (idx >= 3) th.classList.add('user-cell');
-        headerRow.appendChild(th);
-    });
-    thead.appendChild(headerRow);
-
-    const columnMax = {};
-    columns.forEach((col) => {
-        let maxVal = 0;
-        tabs.forEach(tab => {
-            let val = 0;
-            if (selectedEmployee && !isType) val = STATE.fullSessions.filter(s => s.tab === tab && s.session_id === col).reduce((a,b)=>a+b.durationSeconds,0);
-            else val = perUser[col]?.filter(s => s.tab === tab).reduce((a,b)=>a+b.durationSeconds,0) || 0;
-            if(val>maxVal) maxVal=val;
-        });
-        columnMax[col]=maxVal;
-    });
-
-    function getHeatmapColor(val, maxVal) {
-        if(maxVal===0) return { bg:'white', color:'#000' };
-        const intensity = Math.pow(val/maxVal,0.5);
-        const hue = 120;
-        const lightness = 100 - intensity*60;
-        const textColor = intensity>0.6 ? '#fff' : '#000';
-        return { bg:`hsl(${hue},70%,${lightness}%)`, color: textColor };
+    if (selectedEmployee && !isType && idx >= 3) {
+      const session = STATE.fullSessions.find(s => s.session_id === text);
+      if (session) {
+        displayText = new Date(session.start_time).toLocaleString();
+        sessionIdForClick = session.session_id;
+      }
     }
 
-    tabs.forEach((tab, idx) => {
-        const tr = document.createElement('tr');
-        tr.dataset.tab = tab;
-        tr.classList.add(idx%2===0 ? 'eventtype-row-white' : 'eventtype-row-gray', 'sortable');
+    const div = document.createElement('div');
+    div.textContent = displayText;
 
-        const opCell = createCell(tab, false, null, 'operation-cell');
+    if (selectedEmployee && !isType && idx >= 3) {
+      div.style.cursor = "pointer";
+      div.style.textDecoration = "underline";
+      div.addEventListener('click', () => loadTimeline(sessionIdForClick));
+    }
 
-        opCell.addEventListener('mouseenter', async () => {
-            tooltip.style.display = 'block';
-            tooltip.innerHTML = '';
-            let configTitle = eventTypeSelect.value || tab;
-            await loadDescriptionTooltip(configTitle);
+    th.appendChild(div);
+    if (idx >= 3) th.classList.add('user-cell');
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
 
-            const rect = opCell.getBoundingClientRect();
-            tooltip.style.top = `${rect.top - tooltip.offsetHeight - 6 + window.scrollY}px`;
-            tooltip.style.left = `${rect.right - tooltip.offsetWidth + window.scrollX}px`;
-        });
-        opCell.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  // Compute column max values for heatmap
+  const columnMax = {};
+  columns.forEach(col => {
+    let maxVal = 0;
+    tabs.forEach(tab => {
+      let val = 0;
+      if (selectedEmployee && !isType) {
+        val = STATE.fullSessions.filter(s => s.tab === tab && s.session_id === col).reduce((a,b)=>a+b.durationSeconds,0);
+      } else {
+        val = perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0)||0;
+      }
+      if(val>maxVal) maxVal=val;
+    });
+    columnMax[col]=maxVal;
+  });
 
-        tr.appendChild(opCell);
+  function getHeatmapColor(val,maxVal){
+    if(maxVal===0) return {bg:'white',color:'#000'};
+    const intensity = Math.pow(val/maxVal,0.5);
+    const hue=120; const lightness=100-intensity*60;
+    return { bg:`hsl(${hue},70%,${lightness}%)`, color:intensity>0.6?'#fff':'#000' };
+  }
 
-        const totalsArray = columns.map(col => {
-            if(selectedEmployee && !isType) return STATE.fullSessions.filter(s=>s.tab===tab && s.session_id===col).reduce((a,b)=>a+b.durationSeconds,0);
-            else return perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0) || 0;
-        });
-        const total = totalsArray.reduce((a,b)=>a+b,0);
-        const avg = totalsArray.length ? total / totalsArray.length : 0;
-        tr.appendChild(createCell(formatSecondsToHMS(avg),false,null,'summary-cell'));
-        tr.appendChild(createCell(formatSecondsToHMS(total),false,null,'summary-cell'));
+  for(const tab of tabs){
+    const tr=document.createElement('tr'); tr.dataset.tab=tab; tr.classList.add('sortable');
+    const opCell=createCell(tab,false,null,'operation-cell'); tr.appendChild(opCell);
 
-        totalsArray.forEach((val,i)=>{
-            const td=createCell(formatSecondsToHMS(val),false,null,'user-cell');
-            td.dataset.sort = val;
-            const { bg, color } = getHeatmapColor(val,columnMax[columns[i]]);
-            td.style.backgroundColor = bg;
-            td.style.color = color;
-            tr.appendChild(td);
-        });
+    opCell.addEventListener('mouseenter', async () => {
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = '';
+      let configTitle = eventTypeSelect.value || tab;
+      await loadDescriptionTooltip(configTitle);
+      const rect = opCell.getBoundingClientRect();
+      tooltip.style.top = `${rect.top - tooltip.offsetHeight - 6 + window.scrollY}px`;
+      tooltip.style.left = `${rect.right - tooltip.offsetWidth + window.scrollX}px`;
+    });
+    opCell.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
 
-        tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,3));
-        tbody.appendChild(tr);
+    const totalsArray = columns.map(col=>{
+      if(selectedEmployee && !isType) return STATE.fullSessions.filter(s=>s.tab===tab && s.session_id===col).reduce((a,b)=>a+b.durationSeconds,0);
+      else return perUser[col]?.filter(s=>s.tab===tab).reduce((a,b)=>a+b.durationSeconds,0)||0;
+    });
+    const total=totalsArray.reduce((a,b)=>a+b,0);
+    const avg=totalsArray.length?total/totalsArray.length:0;
+    tr.appendChild(createCell(formatSecondsToHMS(avg),false,null,'summary-cell'));
+    tr.appendChild(createCell(formatSecondsToHMS(total),false,null,'summary-cell'));
+
+    totalsArray.forEach((val,i)=>{
+      const td=createCell(formatSecondsToHMS(val),false,null,'user-cell');
+      td.dataset.sort=val;
+      const {bg,color}=getHeatmapColor(val,columnMax[columns[i]]);
+      td.style.backgroundColor=bg; td.style.color=color;
+      tr.appendChild(td);
     });
 
-    applyStickyColumns(table,3);
+    tr.addEventListener('mouseenter',()=>{ opCell.style.backgroundColor='rgba(252,199,93,0.5)'; opCell.style.fontWeight='bold'; });
+    tr.addEventListener('mouseleave',()=>{ opCell.style.backgroundColor=''; opCell.style.fontWeight=''; });
+    tr.addEventListener('click',()=>sortTableByRow(table,tr,STATE.rowSortStates,3));
+
+    tbody.appendChild(tr);
+  }
+
+  applyStickyColumns(table, 3);
+  toggleDownloadButton(tbody.children.length>0);
+
+  // ---------------------- Make Columns Resizable ----------------------
+  function makeColumnsResizable(table){
+    const headers = table.querySelectorAll("thead th");
+    headers.forEach((th,colIndex)=>{
+      if(th.querySelector('.col-resizer')) return;
+      const resizer=document.createElement('div'); resizer.className='col-resizer';
+      th.appendChild(resizer);
+      let startX,startWidth;
+      resizer.addEventListener('mousedown',e=>{
+        e.stopPropagation();
+        startX=e.pageX; startWidth=th.offsetWidth;
+        function onMouseMove(e){
+          const newWidth=Math.max(40,startWidth+(e.pageX-startX));
+          th.style.width=newWidth+'px';
+          table.querySelectorAll(`tr td:nth-child(${colIndex+1})`).forEach(td=>td.style.width=newWidth+'px');
+        }
+        function onMouseUp(){ document.removeEventListener('mousemove',onMouseMove); document.removeEventListener('mouseup',onMouseUp); }
+        document.addEventListener('mousemove',onMouseMove);
+        document.addEventListener('mouseup',onMouseUp);
+      });
+    });
+  }
+
+  // ---------------------- Make Rows Resizable ----------------------
+  function makeRowsResizable(table){
+    const rows=table.querySelectorAll("tbody tr");
+    rows.forEach(row=>{
+      const firstCell=row.querySelector("td");
+      if(!firstCell || firstCell.querySelector('.row-resizer')) return;
+      firstCell.style.position="relative";
+      const resizer=document.createElement('div'); resizer.className='row-resizer';
+      firstCell.appendChild(resizer);
+      let startY,startHeight;
+      resizer.addEventListener('mousedown',e=>{
+        e.stopPropagation();
+        startY=e.pageY; startHeight=row.offsetHeight;
+        function onMouseMove(e){ row.style.height=Math.max(24,startHeight+(e.pageY-startY))+'px'; }
+        function onMouseUp(){ document.removeEventListener('mousemove',onMouseMove); document.removeEventListener('mouseup',onMouseUp); }
+        document.addEventListener('mousemove',onMouseMove);
+        document.addEventListener('mouseup',onMouseUp);
+      });
+    });
+  }
+
+  makeColumnsResizable(table);
+  makeRowsResizable(table);
 }
 
 // ---------------------------- NEW TIMELINE FUNCTION ----------------------------
@@ -521,7 +419,7 @@ async function loadTimeline(sessionId) {
     timelineContainer.style.display = 'block';
     timelineDiv.innerHTML = timelineLegend.innerHTML = timelineSummary.innerHTML = '';
     Object.keys(colorMap).forEach(k => delete colorMap[k]);
-    timelineDiv.style.position = 'relative'; // for absolute children
+    timelineDiv.style.position = 'relative';
 
     try {
         const response = await fetch(`/sessionTimeline?sessionId=${sessionId}`);
@@ -589,7 +487,6 @@ async function loadTimeline(sessionId) {
                 });
                 box.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
 
-
                 timelineDiv.appendChild(box);
                 tabEventMap[ev.event_number] = box;
             }
@@ -598,7 +495,6 @@ async function loadTimeline(sessionId) {
         // --- Other events as vertical lines passing through timeline ---
         data.timeline.forEach(ev => {
             if (ev.event_type !== 'Tabpage') {
-                // Find nearest previous tabpage
                 const tabEvent = data.timeline.slice(0, data.timeline.indexOf(ev)).reverse().find(e => e.event_type === 'Tabpage');
                 if (!tabEvent) return;
                 const parentBox = tabEventMap[tabEvent.event_number];
@@ -609,7 +505,6 @@ async function loadTimeline(sessionId) {
                 line.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#333';
                 line.style.position = 'absolute';
 
-                // Compute left relative to parent box
                 const boxWidth = parentBox.offsetWidth;
                 const boxStartTime = new Date(tabEvent.time_stamp).getTime();
                 const boxEndTime = boxStartTime + tabEvent.durationSeconds * 1000;
@@ -621,13 +516,7 @@ async function loadTimeline(sessionId) {
                 line.style.width = '2px';
                 line.style.height = `${parentBox.offsetHeight + 50}px`;
 
-                // Rotated label above line
-                const label = document.createElement('div');
-                label.className = 'event-label';
-                label.innerText = `${ev.event_type}: ${ev.payload ?? ''}`;
-                line.appendChild(label);
-
-                // Hover tooltip for event line
+                // Tooltip for vertical line
                 line.addEventListener('mouseenter', e => {
                     tooltip.style.display = 'block';
                     tooltip.innerText = `${ev.event_type}\nPayload: ${ev.payload ?? 'None'}\nTime: ${new Date(ev.time_stamp).toLocaleTimeString()}`;
@@ -681,10 +570,32 @@ async function loadTimeline(sessionId) {
     }
 }
 
+let zoomFactor = 1;
+const ZOOM_STEP = 0.2;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
 
-// ---------------------------- END NEW TIMELINE ----------------------------
+const timelineDiv = document.getElementById('timeline');
 
-// Draw charts
+document.getElementById('zoomInBtn').addEventListener('click', () => {
+    zoomFactor = Math.min(zoomFactor + ZOOM_STEP, MAX_ZOOM);
+    timelineDiv.style.transform = `scaleX(${zoomFactor})`;
+    timelineDiv.style.transformOrigin = 'left center';
+});
+
+document.getElementById('zoomOutBtn').addEventListener('click', () => {
+    zoomFactor = Math.max(zoomFactor - ZOOM_STEP, MIN_ZOOM);
+    timelineDiv.style.transform = `scaleX(${zoomFactor})`;
+    timelineDiv.style.transformOrigin = 'left center';
+});
+
+document.getElementById('zoomResetBtn').addEventListener('click', () => {
+    zoomFactor = 1;
+    timelineDiv.style.transform = `scaleX(1)`;
+});
+
+
+// ---------------------------- DRAW CHARTS ----------------------------
 function drawCharts(perUser,tabs,columns,selectedEmployee,isType){
     const chartContainer=document.getElementById('multiChartContainer'); 
     chartContainer.innerHTML=''; 
@@ -700,18 +611,11 @@ function drawCharts(perUser,tabs,columns,selectedEmployee,isType){
         chartWrapper.style.display='flex'; 
         chartWrapper.style.flexDirection='column'; 
         chartWrapper.style.alignItems='center';
-        const title=document.createElement('strong'); 
-        title.textContent=col; 
-        chartWrapper.appendChild(title);
-        const toggleWrapper=document.createElement('label'); 
-        toggleWrapper.style.fontSize='12px'; 
-        toggleWrapper.style.margin='5px 0'; 
-        toggleWrapper.innerHTML=`<input type="checkbox"> Show as %`; 
-        chartWrapper.appendChild(toggleWrapper);
+        const title=document.createElement('strong'); title.textContent=col; chartWrapper.appendChild(title);
+        const toggleWrapper=document.createElement('label'); toggleWrapper.style.fontSize='12px'; toggleWrapper.style.margin='5px 0';
+        toggleWrapper.innerHTML=`<input type="checkbox"> Show as %`; chartWrapper.appendChild(toggleWrapper);
         const percentageCheckbox=toggleWrapper.querySelector('input');
-        const canvas=document.createElement('canvas'); 
-        canvas.style.width='100%'; canvas.style.height='260px'; 
-        chartWrapper.appendChild(canvas);
+        const canvas=document.createElement('canvas'); canvas.style.width='100%'; canvas.style.height='260px'; chartWrapper.appendChild(canvas);
         chartContainer.appendChild(chartWrapper);
         const renderChart=()=>{
             const labels=tabs;
@@ -734,8 +638,6 @@ function drawCharts(perUser,tabs,columns,selectedEmployee,isType){
     });
 }
 </script>
-
-
 
 </body>
 </html>

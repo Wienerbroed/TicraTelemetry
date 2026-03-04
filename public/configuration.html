@@ -4,63 +4,15 @@
 <meta charset="UTF-8">
 <title>Configuration Manager</title>
 <link rel="stylesheet" href="styles/styles.css">
-<style>
-label {
-    font-weight: bold;
-    margin-top: 15px;
-    display: block;
-}
-input, select, textarea {
-    padding: 6px;
-    margin: 5px 0 10px 0;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    width: 300px;
-}
-textarea {
-    width: 400px;
-}
-button {
-    padding: 6px 12px;
-    margin-right: 10px;
-    border: none;
-    border-radius: 4px;
-    background-color: #2f80ed;
-    color: white;
-    cursor: pointer;
-}
-button:hover { background-color: #1366d6; }
-.row {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 20px;
-}
-.config-block {
-    background: white;
-    border-radius: 6px;
-    padding: 15px;
-    margin-top: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    width: 700px;
-}
-.config-block label {
-    display: inline-block;
-    width: 120px;
-}
-.config-block input, .config-block select, .config-block textarea {
-    width: 250px;
-}
-.config-block button.update-btn { background-color: #27ae60; }
-.config-block button.update-btn:hover { background-color: #1e8449; }
-</style>
+<link rel="stylesheet" href="styles/configuration.css">
 </head>
 <body>
 
 <header>
     <div class="navbar">
-        <a href="index.html"> <img src="images/ticra.png" alt="Home" class="nav-icon"> </a>
-        <a href="data.html"> Event DataPool </a>
-        <a href="session.html"> Sessions </a>
+        <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+        <a href="data.html">Event DataPool</a>
+        <a href="session.html">Sessions</a>
     </div>
 </header>
 
@@ -79,7 +31,7 @@ button:hover { background-color: #1366d6; }
 
   <label for="newEventType">Event Type:</label>
   <select id="newEventType">
-    <option value="" disabled selected>-- Select an event type --</option>
+    <option value="" disabled selected>-- Loading event types... --</option>
   </select><br>
 
   <input type="text" id="newPayload" placeholder="Payload Field (e.g., g)"><br>
@@ -115,147 +67,105 @@ button:hover { background-color: #1366d6; }
 <footer>© TICRA foundation</footer>
 
 <script>
-let selectedConfig = null;
-let originalTitle = null;
+document.addEventListener("DOMContentLoaded", async () => {
+  await fetchEventTypes();   // populate event type dropdown
+  await loadDropdowns();     // populate session/event config dropdowns
+  addDropdownListeners();    // attach change listeners
+  document.getElementById("createConfig").addEventListener("click", createNewConfig);
+});
 
-// Fetch event types
+/* ---------- FETCH EVENT TYPES ---------- */
 async function fetchEventTypes() {
-  const res = await fetch("/event");
-  const eventTypes = await res.json();
-  const select = document.getElementById("newEventType");
-  select.innerHTML = '<option value="" disabled selected>-- Select an event type --</option>';
-  select.innerHTML += eventTypes.map(e => `<option value="${e}">${e}</option>`).join("");
-}
-
-// Load configs into dropdowns
-async function loadDropdowns() {
-  const res = await fetch("/api/configs");
-  const configs = await res.json();
-
-  const sessionDropdown = document.getElementById("sessionDropdown");
-  const eventDropdown = document.getElementById("eventDropdown");
-
-  sessionDropdown.innerHTML = '<option value="">-- Select a session config --</option>';
-  eventDropdown.innerHTML = '<option value="">-- Select an event config --</option>';
-
-  configs.forEach(c => {
-    const option = `<option value="${c.title}">${c.title}</option>`;
-    if (c.mode === "session") sessionDropdown.innerHTML += option;
-    if (c.mode === "event") eventDropdown.innerHTML += option;
-  });
-
-  // Keep previous selection
-  if(selectedConfig){
-    if(selectedConfig.mode === "session") sessionDropdown.value = selectedConfig.title;
-    if(selectedConfig.mode === "event") eventDropdown.value = selectedConfig.title;
+  try {
+    const res = await fetch("/event");
+    if (!res.ok) throw new Error("Failed to fetch event types");
+    const types = await res.json();
+    const select = document.getElementById("newEventType");
+    select.innerHTML = '<option value="" disabled selected>-- Select an event type --</option>';
+    types.forEach(type => {
+      const option = document.createElement("option");
+      option.value = type;
+      option.textContent = type;
+      select.appendChild(option);
+    });
+    return types;
+  } catch(err) {
+    console.error(err);
+    document.getElementById("newEventType").innerHTML = '<option value="" disabled selected>-- Error loading --</option>';
+    return [];
   }
 }
 
-// Show selected config info
+/* ---------- LOAD CONFIG DROPDOWNS ---------- */
+async function loadDropdowns() {
+  try {
+    const res = await fetch("/api/configs");
+    if(!res.ok) throw new Error("Failed to fetch configs");
+    const configs = await res.json();
+    const sessionDropdown = document.getElementById("sessionDropdown");
+    const eventDropdown = document.getElementById("eventDropdown");
+
+    sessionDropdown.innerHTML = '<option value="">-- Select a session config --</option>';
+    eventDropdown.innerHTML = '<option value="">-- Select an event config --</option>';
+
+    configs.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.title;
+      opt.textContent = c.title;
+      if(c.mode === "session") sessionDropdown.appendChild(opt);
+      if(c.mode === "event") eventDropdown.appendChild(opt);
+    });
+
+    // Keep selection if config is selected
+    if(selectedConfig){
+      if(selectedConfig.mode==="session") sessionDropdown.value = selectedConfig.title;
+      if(selectedConfig.mode==="event") eventDropdown.value = selectedConfig.title;
+    }
+  } catch(err) {
+    console.error(err);
+  }
+}
+
+/* ---------- DROPDOWN CHANGE LISTENERS ---------- */
+function addDropdownListeners() {
+  document.getElementById("sessionDropdown").addEventListener("change", e => showConfigInfo(e.target.value));
+  document.getElementById("eventDropdown").addEventListener("change", e => showConfigInfo(e.target.value));
+}
+
+/* ---------- SHOW CONFIG INFO ---------- */
 async function showConfigInfo(title) {
-  if (!title) {
+  if(!title) {
     document.getElementById("configInfoContainer").innerHTML = "";
     selectedConfig = null;
     originalTitle = null;
     return;
   }
-  const res = await fetch(`/api/configs/${title}`);
-  const config = await res.json();
-  selectedConfig = config;
-  originalTitle = config.title;
+  try {
+    const res = await fetch(`/api/configs/${title}`);
+    if(!res.ok) throw new Error("Config not found");
+    const config = await res.json();
+    selectedConfig = config;
+    originalTitle = config.title;
 
-  const container = document.getElementById("configInfoContainer");
-  container.innerHTML = `
-    <div class="config-block" id="configBlock">
-      <div><label>Title:</label> <span id="infoTitle">${config.title}</span></div>
-      <div><label>Mode:</label> <span id="infoMode">${config.mode}</span></div>
-      <div><label>Event Type:</label> <span id="infoEventType">${config.event_type}</span></div>
-      <div><label>Payload:</label> <span id="infoPayload">${config.payload_field}</span></div>
-      <div><label>Description:</label> <span id="infoDescription">${config.description || ""}</span></div>
-      ${config.extra_query?.image ? `<div><img src="data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}" style="max-width:200px; margin-top:10px;"></div>` : ""}
-      <div style="margin-top:10px;">
-        <button onclick="deleteConfig()">Delete</button>
-        <button class="update-btn" onclick="enableUpdate()">Update</button>
-      </div>
-    </div>
-  `;
+    const container = document.getElementById("configInfoContainer");
+    container.innerHTML = `
+      <div class="config-block" id="configBlock">
+        <div><label>Title:</label> <span>${config.title}</span></div>
+        <div><label>Mode:</label> <span>${config.mode}</span></div>
+        <div><label>Event Type:</label> <span>${config.event_type}</span></div>
+        <div><label>Payload:</label> <span>${config.payload_field}</span></div>
+        <div><label>Description:</label> <span>${config.description||""}</span></div>
+        ${config.extra_query?.image ? `<div><img src="data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}" style="max-width:200px;margin-top:10px;"></div>` : ""}
+        <div style="margin-top:10px;">
+          <button onclick="deleteConfig()">Delete</button>
+          <button class="update-btn" onclick="enableUpdate()">Update</button>
+        </div>
+      </div>`;
+  } catch(err){ console.error(err); }
 }
 
-// Enable update fields
-function enableUpdate() {
-  if (!selectedConfig) return;
-  const block = document.getElementById("configBlock");
-  block.innerHTML = `
-    <div><label>Title:</label> <input id="updateTitle" value="${selectedConfig.title}"></div>
-    <div><label>Mode:</label>
-      <select id="updateMode">
-        <option value="session" ${selectedConfig.mode==="session"?"selected":""}>session</option>
-        <option value="event" ${selectedConfig.mode==="event"?"selected":""}>event</option>
-      </select>
-    </div>
-    <div><label>Event Type:</label>
-      <select id="updateEventType"></select>
-    </div>
-    <div><label>Payload:</label> <input id="updatePayload" value="${selectedConfig.payload_field}"></div>
-    <div><label>Description:</label>
-      <textarea id="updateDescription" rows="4" maxlength="200">${selectedConfig.description || ""}</textarea>
-    </div>
-    <div><label>Upload Image (optional):</label> <input type="file" id="updateImage" accept="image/*"></div>
-    <div style="margin-top:10px;">
-      <button onclick="saveUpdate()">Save</button>
-      <button onclick="cancelUpdate()">Cancel</button>
-    </div>
-  `;
-  // Fill event type dropdown
-  fetch("/event").then(r=>r.json()).then(types=>{
-    const sel = document.getElementById("updateEventType");
-    sel.innerHTML = types.map(t=>`<option value="${t}" ${t===selectedConfig.event_type?"selected":""}>${t}</option>`).join("");
-  });
-}
-
-// Cancel update
-function cancelUpdate() {
-  showConfigInfo(originalTitle);
-}
-
-// Save update including title, description & image
-async function saveUpdate() {
-  const oldTitle = originalTitle;
-  const newTitle = document.getElementById("updateTitle").value.trim();
-  const mode = document.getElementById("updateMode").value;
-  const event_type = document.getElementById("updateEventType").value;
-  const payload_field = document.getElementById("updatePayload").value.trim();
-  const description = document.getElementById("updateDescription").value.trim();
-  const imageInput = document.getElementById("updateImage");
-
-  if (!newTitle||!mode||!event_type||!payload_field) return alert("All fields are required");
-
-  const formData = new FormData();
-  formData.append("title", newTitle);
-  formData.append("mode", mode);
-  formData.append("event_type", event_type);
-  formData.append("payload_field", payload_field);
-  formData.append("description", description);
-  if(imageInput.files[0]) formData.append("image", imageInput.files[0]);
-
-  await fetch(`/api/configs/${oldTitle}`, { method:"PUT", body: formData });
-  await loadDropdowns();
-  showConfigInfo(newTitle);
-}
-
-// Delete config
-async function deleteConfig() {
-  if (!selectedConfig) return;
-  if (!confirm(`Delete "${selectedConfig.title}"?`)) return;
-  await fetch(`/api/configs/${selectedConfig.title}`, {method:"DELETE"});
-  selectedConfig = null;
-  originalTitle = null;
-  document.getElementById("configInfoContainer").innerHTML = "";
-  await loadDropdowns();
-}
-
-// Create new config
-document.getElementById("createConfig").addEventListener("click", async ()=>{
+/* ---------- CREATE / UPDATE / DELETE FUNCTIONS ---------- */
+async function createNewConfig(){
   const title = document.getElementById("newTitle").value.trim();
   const mode = document.getElementById("newMode").value;
   const event_type = document.getElementById("newEventType").value;
@@ -273,19 +183,11 @@ document.getElementById("createConfig").addEventListener("click", async ()=>{
   formData.append("description", description);
   if(imageInput.files[0]) formData.append("image", imageInput.files[0]);
 
-  const response = await fetch("/api/configs", {
-    method: "POST",
-    body: formData
-  });
+  const res = await fetch("/api/configs",{method:"POST", body:formData});
+  const result = await res.json();
+  if(!res.ok) return alert(result.error);
 
-const result = await response.json();
-
-if (!response.ok) {
-  alert(result.error);
-  return;
-}
-
-
+  // reset form
   document.getElementById("newTitle").value="";
   document.getElementById("newPayload").value="";
   document.getElementById("newDescription").value="";
@@ -294,15 +196,18 @@ if (!response.ok) {
   document.getElementById("newImage").value="";
 
   await loadDropdowns();
-});
+}
 
-// Dropdown listeners
-document.getElementById("sessionDropdown").addEventListener("change", e=>showConfigInfo(e.target.value));
-document.getElementById("eventDropdown").addEventListener("change", e=>showConfigInfo(e.target.value));
-
-// Initial load
-fetchEventTypes();
-loadDropdowns();
+/* ---------- DELETE CONFIG ---------- */
+async function deleteConfig(){
+  if(!selectedConfig) return;
+  if(!confirm(`Delete "${selectedConfig.title}"?`)) return;
+  await fetch(`/api/configs/${selectedConfig.title}`, {method:"DELETE"});
+  selectedConfig=null; originalTitle=null;
+  document.getElementById("configInfoContainer").innerHTML="";
+  await loadDropdowns();
+}
 </script>
+
 </body>
 </html>

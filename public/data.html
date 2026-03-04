@@ -4,31 +4,11 @@
 <meta charset="UTF-8">
 <title>Event Pool Viewer</title>
 <link rel="stylesheet" href="styles/styles.css">
+<link rel="stylesheet" href="styles/data.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="scripts/utils.js"></script>
-<style>
-#tableContainerWrapper { position: relative; margin-bottom: 20px; }
-#downloadBtn { display: none; margin: 10px auto; cursor: pointer; background: none; border: none; padding: 0; }
-#downloadBtn img { display: block; }
 
-.tooltip {
-  position: absolute;
-  background: rgba(255,255,255,0.95);
-  border: 1px solid #aaa;
-  border-radius: 6px;
-  padding: 8px;
-  font-size: 12px;
-  max-width: 500px;
-  z-index: 9999;
-  display: none;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-}
-.tooltip img {
-  max-width: 500px;
-  max-height: 300px;
-  display: block;
-  margin-top: 4px;
-}
+<style>
 </style>
 </head>
 <body>
@@ -49,11 +29,9 @@
     <label>Start date: <input type="date" id="startDate"></label>
     <label>End date: <input type="date" id="endDate"></label>
 
-    
-      <button type="button" class="preset-btn" data-range="10">Last 10 days</button>
-      <button type="button" class="preset-btn" data-range="30">Last 1 month</button>
-      <button type="button" class="preset-btn" data-range="all">All time</button>
-    
+    <button type="button" class="preset-btn" data-range="10">Last 10 days</button>
+    <button type="button" class="preset-btn" data-range="30">Last 1 month</button>
+    <button type="button" class="preset-btn" data-range="all">All time</button>
   </div>
 
   <div>
@@ -87,7 +65,6 @@
 
 <div id="multiChartContainer"></div>
 
-<!-- Tooltip element -->
 <div id="tooltip" class="tooltip"></div>
 
 <footer>© TICRA foundation</footer>
@@ -142,7 +119,6 @@ function formatDate(date) {
 function setPresetRange(range) {
   const startInput = document.getElementById('startDate');
   const endInput = document.getElementById('endDate');
-
   const today = new Date();
 
   if (range === 'all') {
@@ -153,17 +129,12 @@ function setPresetRange(range) {
   }
 
   const past = new Date();
-
-  if (range === 30) {
-    past.setMonth(today.getMonth() - 1); 
-  } else {
-    past.setDate(today.getDate() - range);
-  }
+  if (range === 30) past.setMonth(today.getMonth() - 1);
+  else past.setDate(today.getDate() - range);
 
   startInput.value = formatDate(past);
   endInput.value = formatDate(today);
 }
-
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -172,8 +143,6 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   });
 });
 
-
-// APPLY BUTTON
 document.getElementById('applyButton').addEventListener('click', async () => {
   const selectedEventTypes = getCheckedValues('eventTypeGroup');
   if (!selectedEventTypes.length) return;
@@ -211,7 +180,6 @@ document.getElementById('applyButton').addEventListener('click', async () => {
   renderTableAndCharts();
 });
 
-// PER-USER DATA
 function buildPerUser(events){
   const perUser={}, totals={};
   events.forEach(e=>totals[e.user]=(totals[e.user]??0)+e.count);
@@ -223,14 +191,15 @@ function buildPerUser(events){
   });
   return perUser;
 }
-function getSelections(perUser){ return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort(); }
 
-// DOWNLOAD BUTTON
+function getSelections(perUser){
+  return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort();
+}
+
 const downloadBtn = document.getElementById('downloadBtn');
 downloadBtn.addEventListener('click',()=>downloadTableCSV());
 function toggleDownloadButton(show){ downloadBtn.style.display = show?'block':'none'; }
 
-// DRAW TABLE
 async function drawTable(perUser, selections) {
   const table = document.getElementById('bigTable');
   const thead = table.querySelector('thead'); 
@@ -238,9 +207,6 @@ async function drawTable(perUser, selections) {
   thead.innerHTML = ''; 
   tbody.innerHTML = '';
 
-  // ----------------------
-  // HEADER
-  // ----------------------
   const headerRow = document.createElement('tr');
   ['Operation', 'MOST USED', 'AVERAGE', 'TOTAL', ...STATE.userOrder].forEach((text, index) => {
     const th = document.createElement('th'); 
@@ -253,21 +219,72 @@ async function drawTable(perUser, selections) {
   });
   thead.appendChild(headerRow);
 
-  // ----------------------
-  // TABLE BODY
-  // ----------------------
-  let rowColorToggle = false; // start with white
+  function makeColumnsResizable(table) {
+    const headers = table.querySelectorAll("thead th");
+    headers.forEach((th, colIndex) => {
+      if (th.querySelector('.col-resizer')) return;
+      const resizer = document.createElement("div");
+      resizer.classList.add("col-resizer");
+      th.appendChild(resizer);
+      let startX, startWidth;
+      resizer.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        startX = e.pageX;
+        startWidth = th.offsetWidth;
+        function onMouseMove(e) {
+          const newWidth = Math.max(40, startWidth + (e.pageX - startX));
+          th.style.width = newWidth + "px";
+          table.querySelectorAll(`tr td:nth-child(${colIndex + 1})`)
+            .forEach(td => td.style.width = newWidth + "px");
+        }
+        function onMouseUp() {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+        }
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+      });
+    });
+  }
+
+  function makeRowsResizable(table) {
+    const rows = table.querySelectorAll("tbody tr");
+    rows.forEach(row => {
+      const firstCell = row.querySelector("td");
+      if (!firstCell || firstCell.querySelector('.row-resizer')) return;
+      firstCell.style.position = "relative";
+      const resizer = document.createElement("div");
+      resizer.classList.add("row-resizer");
+      firstCell.appendChild(resizer);
+      let startY, startHeight;
+      resizer.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        startY = e.pageY;
+        startHeight = row.offsetHeight;
+        function onMouseMove(e) {
+          const newHeight = Math.max(24, startHeight + (e.pageY - startY));
+          row.style.height = newHeight + "px";
+        }
+        function onMouseUp() {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+        }
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+      });
+    });
+  }
+
+  let rowColorToggle = false;
+
   for (const eventType of STATE.eventTypeOrder) {
     const eventSelections = selections.filter(s => s.startsWith(eventType + '::'));
-
-    // Fetch config once for this eventType
     const config = await fetchJson(`/api/configs/${encodeURIComponent(eventType)}`).catch(() => null);
     const description = config?.description ?? '';
     const imgSrc = config?.extra_query?.image?.data
       ? `data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}`
       : null;
 
-    // Compute column max for heatmap
     const columnMax = {}; 
     STATE.userOrder.forEach(u => {
       let maxVal = 0; 
@@ -281,83 +298,60 @@ async function drawTable(perUser, selections) {
     for (const sel of eventSelections) {
       const tr = document.createElement('tr'); 
       tr.classList.add('sortable');
-
-      // ----------------------
-      // SET ROW COLOR FOR OPERATION COLUMN ONLY
-      // ----------------------
       tr.classList.add(rowColorToggle ? 'eventtype-grey' : 'eventtype-white');
 
       const displayName = sel.split('::')[1];
-
-      // ----------------------
-      // OPERATION CELL
-      // ----------------------
       const opCell = createCell(displayName, false, null, 'operation-cell');
       tr.appendChild(opCell);
 
-      // ----------------------
-      // TOOLTIP
-      // ----------------------
-opCell.addEventListener('mouseenter', (e) => {
-    tooltip.innerHTML = ''; 
-    tooltip.style.display = 'block';
+      opCell.addEventListener('mouseenter', (e) => {
+        tooltip.innerHTML = ''; 
+        tooltip.style.display = 'block';
+        if (eventType) {
+          const titleP = document.createElement('p');
+          titleP.textContent = eventType;
+          titleP.style.fontWeight = 'bold';
+          tooltip.appendChild(titleP);
+        }
+        if (description) { 
+          const p = document.createElement('p'); 
+          p.textContent = description; 
+          tooltip.appendChild(p); 
+        }
+        if (imgSrc) { 
+          const img = document.createElement('img'); 
+          img.src = imgSrc; 
+          tooltip.appendChild(img); 
+        }
+        const selP = document.createElement('p'); 
+        selP.textContent = displayName; 
+        tooltip.appendChild(selP);
+        const offsetY = 10; 
+        tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
+        tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 10}px`;
+      });
 
-    if (eventType) {
-        const titleP = document.createElement('p');
-        titleP.textContent = eventType;
-        titleP.style.fontWeight = 'bold';
-        tooltip.appendChild(titleP);
-    }
+      opCell.addEventListener('mousemove', (e) => {
+        const offsetY = 10;
+        tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
+        tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 100}px`;
+      });
 
-    if (description) { 
-        const p = document.createElement('p'); 
-        p.textContent = description; 
-        tooltip.appendChild(p); 
-    }
-    if (imgSrc) { 
-        const img = document.createElement('img'); 
-        img.src = imgSrc; 
-        tooltip.appendChild(img); 
-    }
-    const selP = document.createElement('p'); 
-    selP.textContent = displayName; 
-    tooltip.appendChild(selP);
+      opCell.addEventListener('mouseleave', () => { 
+        tooltip.style.display = 'none'; 
+      });
 
-    
-    
-    const offsetY = 10; 
-    tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
-    tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 10}px`;
-});
-
-opCell.addEventListener('mousemove', (e) => {
-    
-    const offsetY = 10;
-    tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
-    tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 100}px`;
-});
-
-opCell.addEventListener('mouseleave', () => { 
-    tooltip.style.display = 'none'; 
-});
-
-
-      // ----------------------
-      // SUMMARY CELLS
-      // ----------------------
       const total = STATE.userOrder.reduce((sum, u) => sum + (perUser[u]?.[sel] ?? 0), 0);
       const avg = STATE.userOrder.length ? (total / STATE.userOrder.length).toFixed(2) : 0;
       let mostUsed = 0; 
       STATE.userOrder.forEach(u => {
         if ((perUser[u]?.[sel] ?? 0) === columnMax[u] && columnMax[u] > 0) mostUsed++;
       });
+
       tr.appendChild(createCell(mostUsed, false, null, 'summary-cell'));
       tr.appendChild(createCell(avg, false, null, 'summary-cell'));
       tr.appendChild(createCell(total, false, null, 'summary-cell'));
 
-      // ----------------------
-      // USER CELLS (heatmap)
-      // ----------------------
       STATE.userOrder.forEach(u => {
         const val = perUser[u]?.[sel] ?? 0;
         const intensity = columnMax[u] ? Math.pow(val / columnMax[u], 0.5) : 0;
@@ -369,9 +363,6 @@ opCell.addEventListener('mouseleave', () => {
         tr.appendChild(td);
       });
 
-      // ----------------------
-      // ROW HOVER
-      // ----------------------
       tr.addEventListener('mouseenter', () => { 
         opCell.style.backgroundColor = 'rgba(252,199,93,0.5)'; 
         opCell.style.fontWeight = 'bold'; 
@@ -381,37 +372,33 @@ opCell.addEventListener('mouseleave', () => {
         opCell.style.fontWeight = ''; 
       });
 
-      // ----------------------
-      // ROW CLICK SORTING
-      // ----------------------
       tr.addEventListener('click', () => sortTableByRow(table, tr, STATE.rowSortStates, 4));
 
       tbody.appendChild(tr);
     }
 
-    // ----------------------
-    // Toggle color for next eventType
-    // ----------------------
     rowColorToggle = !rowColorToggle;
   }
 
   applyStickyColumns(table, 4);
   toggleDownloadButton(tbody.children.length > 0);
+  makeColumnsResizable(table);
+  makeRowsResizable(table);
 }
 
-
-
-// RENDER TABLE & CHARTS
 function renderTableAndCharts(){
   const perUser=buildPerUser(STATE.fullEvents);
   const selections=getSelections(perUser);
   drawTable(perUser,selections);
   const chartContainer=document.getElementById('multiChartContainer');
-  chartContainer.style.display='grid'; chartContainer.style.gridTemplateColumns='repeat(2,1fr)'; chartContainer.style.gap='20px';
+  chartContainer.style.display='grid';
+  chartContainer.style.gridTemplateColumns='repeat(2,1fr)';
+  chartContainer.style.gap='20px';
   renderMultipleBarCharts(chartContainer,perUser,STATE.eventTypeOrder,COLORS,false);
 }
 
-loadEventTypes(); loadEmployeeTypes();
+loadEventTypes();
+loadEmployeeTypes();
 </script>
 
 </body>
