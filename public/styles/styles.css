@@ -348,3 +348,60 @@ th {
 #downloadBtn:hover {
     opacity: 0.85;
 }
+
+.tooltip {
+  position: absolute;
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 12px;
+  max-width: 500px;
+  z-index: 9999;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.tooltip img {
+  max-width: 500px;
+  max-height: 300px;
+  display: block;
+  margin-top: 4px;
+}
+/* Column resizer */
+th .col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;          /* draggable area width */
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 10;
+}
+
+/* Row resizer */
+td .row-resizer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;         /* draggable area height */
+  cursor: row-resize;
+  user-select: none;
+  z-index: 10;
+}
+
+/* Visual hover indicator */
+th .col-resizer:hover,
+td .row-resizer:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Make first column sticky without affecting initial size */
+table#bigTable th.sticky,
+table#bigTable td.operation-cell {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background-color: #fff;
+}
