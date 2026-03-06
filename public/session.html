@@ -6,8 +6,8 @@
 <link rel="stylesheet" href="styles/styles.css">
 <link rel="stylesheet" href="styles/session.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="module" src="scripts/utils.js"></script>
 </head>
-
 <body>
 <div id="tooltip" class="tooltip"></div>    
 
@@ -70,11 +70,11 @@
   <div class="timeline-wrapper">
     <div id="timeline" class="timeline"></div>
   </div>
-  <div style="margin-bottom:10px;">
-    <button id="zoomOutBtn">- Zoom Out</button>
-    <button id="zoomInBtn">+ Zoom In</button>
-    <button id="zoomResetBtn">Reset Zoom</button>
-  </div>
+    <div style="margin-bottom:10px;">
+        <button id="zoomOutBtn">- Zoom Out</button>
+        <button id="zoomInBtn">+ Zoom In</button>
+        <button id="zoomResetBtn">Reset Zoom</button>
+    </div>
   <div id="timelineLegend" class="legend"></div>
 </div>
 
@@ -84,40 +84,40 @@
   © TICRA foundation
 </footer>
 
-<!-- Download CSV Button -->
-<span id="downloadBtn" style="display:none;">
-  <img src="/images/Excel-Logo.png" alt="Excel" width="100" title="Download CSV">
-</span>
-
-<!-- Inline module script -->
 <script type="module">
-import { setDefaultDateRange, fetchJson, createCell, sortTableByRow, applyStickyColumns, formatSecondsToHMS, renderBarChart, downloadTableCSV } from './scripts/utils.js';
+import { 
+  COLORS, setDefaultDateRange, fetchJson, createCell, sortTableByRow, 
+  applyStickyColumns, formatSecondsToHMS, downloadTableCSV
+} from './scripts/utils.js';
+import { loadTimeline } from './scripts/timeline.js';
 import { renderSessionTable } from './scripts/sessionTable.js';
 import { renderSessionCharts } from './scripts/sessionCharts.js';
-import { loadTimeline } from './scripts/timeline.js';
 
-const STATE = {
-    fullSessions: [],
-    activeUsers: [],
-    userOrder: [],
-    sessionOrder: [],
-    rowSortStates: {}
-};
-
+const STATE = { fullSessions: [], activeUsers: [], userOrder: [], sessionOrder: [], rowSortStates: {} };
 const eventTypeSelect = document.getElementById("eventTypeSelect");
 const employeeSelect = document.getElementById("employeeSelect");
 const startInput = document.getElementById("startTime");
 const endInput = document.getElementById("endTime");
 const applyButton = document.getElementById("applyButton");
 const tooltip = document.getElementById('tooltip');
-const downloadBtn = document.getElementById('downloadBtn');
+window.loadTimeline = loadTimeline;
 
-downloadBtn.addEventListener('click', () => downloadTableCSV());
+// Download button
+const downloadBtn = document.createElement('span');
+downloadBtn.id = 'downloadBtn';
+downloadBtn.innerHTML = '<img src="/images/Excel-Logo.png" alt="Excel" width="100">';
+downloadBtn.title = 'Download CSV';
+downloadBtn.addEventListener('click', () => { downloadTableCSV(); });
+document.getElementById('tableContainerWrapper').appendChild(downloadBtn);
+
+function toggleDownloadButton(show) { 
+    downloadBtn.style.display = show ? 'block' : 'none'; 
+}
 
 // Set default date range
 setDefaultDateRange('startTime','endTime',10);
 
-// Load dropdowns
+// Initialize dropdowns
 async function initDropdowns() {
     const eventTypes = await fetchJson('/sessionTypes');
     eventTypeSelect.innerHTML = '<option value="">Select Event Type</option>';
@@ -129,18 +129,17 @@ async function initDropdowns() {
 
     if(employeeTypes.length){
         const group = document.createElement("optgroup"); group.label="Employee Types";
-        employeeTypes.forEach(t => { const opt = document.createElement("option"); opt.value = t; opt.textContent = t; opt.dataset.type="employeeType"; group.appendChild(opt); });
+        employeeTypes.forEach(t=>{ const opt=document.createElement("option"); opt.value=t; opt.textContent=t; opt.dataset.type="employeeType"; group.appendChild(opt); });
         employeeSelect.appendChild(group);
     }
     if(users.length){
-        const group = document.createElement("optgroup"); group.label="Employees";
-        [...new Set(users)].forEach(u => { const opt = document.createElement("option"); opt.value = u; opt.textContent = u; opt.dataset.type="user"; group.appendChild(opt); });
+        const group=document.createElement("optgroup"); group.label="Employees";
+        [...new Set(users)].forEach(u=>{ const opt=document.createElement("option"); opt.value=u; opt.textContent=u; opt.dataset.type="user"; group.appendChild(opt); });
         employeeSelect.appendChild(group);
     }
 }
 initDropdowns();
 
-// Preset buttons
 function formatDateTimeLocal(date) {
     const pad = n => n.toString().padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -154,52 +153,16 @@ function setPresetRange(range) {
     startInput.value = formatDateTimeLocal(start);
     endInput.value = formatDateTimeLocal(now);
 }
-document.querySelectorAll('.preset-btn').forEach(btn => btn.addEventListener('click', () => setPresetRange(btn.dataset.range === 'all' ? 'all' : parseInt(btn.dataset.range))));
 
-// Apply button
-applyButton.addEventListener('click', async e => {
-    e.preventDefault();
-    const selectedConfig = eventTypeSelect.value; if(!selectedConfig) return;
-    const selectedEmployee = employeeSelect.value || null;
-    const selectedOption = employeeSelect.querySelector(`option[value="${selectedEmployee}"]`);
-    const isEmployeeType = selectedOption?.dataset.type==='employeeType';
-
-    const startTime = startInput.value || new Date(Date.now()-30*24*60*60*1000).toISOString();
-    const endTime = endInput.value || new Date().toISOString();
-
-    const params = new URLSearchParams();
-    params.append('configTitle', selectedConfig);
-    params.append('startTime', startTime);
-    params.append('endTime', endTime);
-    if(isEmployeeType && selectedEmployee) params.append('employee_type', selectedEmployee);
-    else if(selectedEmployee) params.append('user_name', selectedEmployee);
-
-    try {
-        const data = await fetchJson(`/session?${params.toString()}`);
-        STATE.fullSessions = data.sessions || [];
-        renderAllSessions(selectedEmployee, isEmployeeType);
-    } catch(err) { console.error(err); alert("Failed to load sessions."); STATE.fullSessions=[]; renderAllSessions(); }
+document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const range = btn.dataset.range;
+        setPresetRange(range==='all'?'all':parseInt(range));
+    });
 });
 
-function renderAllSessions(selectedEmployee=null, isEmployeeType=false){
-    const sessions = STATE.fullSessions;
-    if(!sessions.length){
-        renderSessionTable({ sessions: [], state: STATE });
-        renderSessionCharts({ sessions: [], state: STATE });
-        downloadBtn.style.display = 'none';
-        return;
-    }
-
-    const perUser = {};
-    sessions.forEach(s => { const user = s.user_name||"Unknown"; if(!perUser[user]) perUser[user]=[]; perUser[user].push(s); });
-    const tabs = [...new Set(sessions.map(s=>s.tab))].sort();
-
-    renderSessionTable({ sessions, perUser, tabs, selectedEmployee, isEmployeeType, state: STATE, loadTimeline });
-    renderSessionCharts({ sessions, perUser, tabs, selectedEmployee, isEmployeeType, state: STATE });
-    downloadBtn.style.display = 'block';
-}
-
-async function loadDescriptionTooltip(configTitle) {
+// Tooltip loader
+window.loadDescriptionTooltip = async function(configTitle){
     if (!configTitle) return;
     try {
         const configQuery = await fetchJson(`/api/configs/${encodeURIComponent(configTitle)}`);
@@ -208,15 +171,75 @@ async function loadDescriptionTooltip(configTitle) {
         const imgObj = configQuery.extra_query?.image;
 
         let html = `<strong>${title}</strong>`;
-        if (description) html += `<div>${description}</div>`;
-        if (imgObj?.data) html += `<img src="data:${imgObj.contentType};base64,${imgObj.data}" style="margin-top:6px; max-width:300px; max-height:200px;">`;
+        if(description) html+=`<div>${description}</div>`;
+        if(imgObj?.data) html+=`<img src="data:${imgObj.contentType};base64,${imgObj.data}" style="margin-top:6px; max-width:300px; max-height:200px;">`;
 
         tooltip.innerHTML = html;
-    } catch (e) {
+    } catch(e){
         tooltip.innerHTML = `<strong>${configTitle}</strong><div>No description available</div>`;
     }
+};
+
+// Apply button fetch
+applyButton.addEventListener('click', async e=>{
+    e.preventDefault();
+    const selectedConfig = eventTypeSelect.value;
+    if(!selectedConfig) return;
+
+    const selectedEmployee = employeeSelect.value || null;
+    const selectedOption = employeeSelect.querySelector(`option[value="${selectedEmployee}"]`);
+    const isType = selectedOption?.dataset.type==='employeeType';
+
+    const startTime = startInput.value || new Date(Date.now()-30*24*60*60*1000).toISOString();
+    const endTime = endInput.value || new Date().toISOString();
+    const params = new URLSearchParams();
+    params.append('configTitle', selectedConfig);
+    params.append('startTime', startTime);
+    params.append('endTime', endTime);
+    if(isType && selectedEmployee) params.append('employee_type', selectedEmployee);
+    else if(selectedEmployee) params.append('user_name', selectedEmployee);
+
+    try{
+        const data = await fetchJson(`/session?${params.toString()}`);
+        STATE.fullSessions = data.sessions || [];
+        renderTableAndCharts(selectedEmployee, isType);
+    }catch(err){
+        console.error(err); alert("Failed to load sessions.");
+        STATE.fullSessions=[]; renderTableAndCharts();
+    }
+});
+
+// Render table and charts
+function renderTableAndCharts(selectedEmployee=null,isType=false){
+    const sessions = STATE.fullSessions;
+    const table=document.getElementById('bigTable');
+    if(!sessions.length){
+        table.querySelector('thead').innerHTML='';
+        table.querySelector('tbody').innerHTML='';
+        document.getElementById('multiChartContainer').innerHTML='';
+        toggleDownloadButton(false);
+        return;
+    }
+
+    const perUser={};
+    sessions.forEach(s=>{ const user=s.user_name||"Unknown"; if(!perUser[user]) perUser[user]=[]; perUser[user].push(s); });
+
+    let columns=[];
+    if(selectedEmployee && !isType){ 
+        STATE.sessionOrder=[...new Set(sessions.map(s=>s.session_id))].sort(); 
+        columns=STATE.sessionOrder; 
+    } else { 
+        STATE.activeUsers=Object.keys(perUser).sort(); 
+        STATE.userOrder=[...STATE.activeUsers]; 
+        columns=STATE.userOrder;
+    }
+
+    const tabs=[...new Set(sessions.map(s=>s.tab))].sort();
+
+    renderSessionTable(STATE, perUser, tabs, selectedEmployee, isType);
+    renderSessionCharts(STATE, perUser, tabs, columns, selectedEmployee, isType);
+    toggleDownloadButton(document.querySelector('#bigTable tbody').children.length > 0);
 }
 </script>
-
 </body>
 </html>

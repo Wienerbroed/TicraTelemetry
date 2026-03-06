@@ -1,18 +1,14 @@
-// scripts/charts.js
+// scripts/sessionCharts.js
 import { renderBarChart, COLORS } from './utils.js';
 
-export function renderSessionCharts({ sessions, perUser, tabs, selectedEmployee, isEmployeeType, state } = {}) {
+export function renderSessionCharts(STATE, perUser, tabs, columns, selectedEmployee=null, isType=false) {
     const chartContainer = document.getElementById('multiChartContainer');
     chartContainer.innerHTML = '';
     chartContainer.style.display = 'grid';
-    chartContainer.style.gridTemplateColumns = 'repeat(2, 1fr)';
+    chartContainer.style.gridTemplateColumns = 'repeat(2,1fr)';
     chartContainer.style.gap = '20px';
 
-    const columns = (selectedEmployee && !isEmployeeType)
-        ? [...new Set(sessions.map((s) => s.session_id))].sort()
-        : Object.keys(perUser).sort();
-
-    columns.forEach((column) => {
+    columns.forEach(col => {
         const chartWrapper = document.createElement('div');
         chartWrapper.style.border = '1px solid #ddd';
         chartWrapper.style.borderRadius = '6px';
@@ -23,7 +19,7 @@ export function renderSessionCharts({ sessions, perUser, tabs, selectedEmployee,
         chartWrapper.style.alignItems = 'center';
 
         const title = document.createElement('strong');
-        title.textContent = column;
+        title.textContent = col;
         chartWrapper.appendChild(title);
 
         const toggleWrapper = document.createElement('label');
@@ -43,41 +39,34 @@ export function renderSessionCharts({ sessions, perUser, tabs, selectedEmployee,
 
         const renderChart = () => {
             const labels = tabs;
-            let data = tabs.map((tab) => {
-                if (selectedEmployee && !isEmployeeType) {
-                    return sessions
-                        .filter((s) => s.session_id === column && s.tab === tab)
+            let data = tabs.map(tab => {
+                if (selectedEmployee && !isType) {
+                    return STATE.fullSessions.filter(s => s.session_id === col && s.tab === tab)
                         .reduce((a, b) => a + b.durationSeconds, 0);
                 } else {
-                    return perUser[column]?.filter((s) => s.tab === tab).reduce((a, b) => a + b.durationSeconds, 0) || 0;
+                    return perUser[col]?.filter(s => s.tab === tab).reduce((a, b) => a + b.durationSeconds, 0) || 0;
                 }
             });
 
             if (percentageCheckbox.checked) {
                 const total = data.reduce((a, b) => a + b, 1);
-                data = data.map((d) => ((d / total) * 100).toFixed(2));
+                data = data.map(d => (d / total * 100).toFixed(2));
             }
 
-            renderBarChart(
-                canvas,
-                labels,
-                data,
-                COLORS.slice(0, labels.length),
-                {
-                    responsive: true,
-                    animation: false,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: percentageCheckbox.checked ? 100 : undefined,
-                            title: { display: true, text: percentageCheckbox.checked ? 'Percentage (%)' : 'Seconds' }
-                        }
+            renderBarChart(canvas, labels, data, COLORS.slice(0, labels.length), {
+                responsive: true,
+                animation: false,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: percentageCheckbox.checked ? 100 : undefined,
+                        title: { display: true, text: percentageCheckbox.checked ? 'Percentage (%)' : 'Seconds' }
                     }
                 }
-            );
+            });
         };
 
         percentageCheckbox.addEventListener('change', renderChart);
