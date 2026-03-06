@@ -10,7 +10,6 @@ const eventTypeCollection = database.collection('gui_event');
 
 // Array to store uniqu users
 const userList = [];
-const employeeTypeList = [];
 
 
 // Functions

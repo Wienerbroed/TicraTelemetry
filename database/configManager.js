@@ -2,14 +2,14 @@ import { connectConfigDB } from "./db.js";
 
 const COLLECTION = "config";
 
-// Validate mode
+// ================= VALIDATE DATA =================
 const validateMode = (mode) => {
   if (!["session", "event"].includes(mode)) {
     throw new Error("Mode must be either 'session' or 'event'");
   }
 };
 
-// Validate required fields
+
 const validateRequiredFields = ({ title, mode, event_type, payload_field, description }) => {
   if (!title) throw new Error("title is required");
   if (!mode) throw new Error("mode is required");
@@ -19,7 +19,7 @@ const validateRequiredFields = ({ title, mode, event_type, payload_field, descri
   validateMode(mode);
 };
 
-// Create a new config
+// ================= CRUD CONFIG =================
 const createConfig = async ({ title, mode, event_type, payload_field, description, extra_query = {} }) => {
   validateRequiredFields({ title, mode, event_type, payload_field, description });
 
@@ -44,56 +44,14 @@ const createConfig = async ({ title, mode, event_type, payload_field, descriptio
   return configDoc;
 };
 
-// Build query from config (for datapool)
-const buildQueryFromConfig = (config) => {
-  const baseQuery = { event_type: config.event_type, ...config.extra_query };
 
-  const fields = { _id: 0, time_stamp: 1, user_name: 1 };
-  if (config.mode === "session") {
-    fields.event_number = 1;
-    fields.session_id = 1;
-  }
-  if (config.mode === "event") {
-    fields.employee_type = 1;
-  }
-
-  if (Array.isArray(config.payload_field)) {
-    config.payload_field.forEach(f => fields[`payload.${f}`] = 1);
-  } else {
-    fields[`payload.${config.payload_field}`] = 1;
-  }
-
-  return { [config.title]: { query: baseQuery, fields, description: config.description } };
-};
-
-// Get query for a config
-const getConfigQuery = async (title) => {
-  if (!title) throw new Error("title is required");
-
-  const db = await connectConfigDB();
-  const collection = db.collection(COLLECTION);
-
-  const config = await collection.findOne({ title });
-  if (!config) throw new Error("Config not found");
-
-  return buildQueryFromConfig(config);
-};
-
-// Get raw config
-const getRawConfig = async (title) => {
-  const db = await connectConfigDB();
-  const collection = db.collection(COLLECTION);
-  return await collection.findOne({ title }, { projection: { _id: 0 } });
-};
-
-// List all configs
 const listConfigs = async () => {
   const db = await connectConfigDB();
   const collection = db.collection(COLLECTION);
   return await collection.find({}, { projection: { _id: 0 } }).toArray();
 };
 
-// Update config
+
 const updateConfig = async (oldTitle, updates) => {
   if (!oldTitle) throw new Error("title is required");
 
@@ -123,7 +81,7 @@ const updateConfig = async (oldTitle, updates) => {
   return { success: true };
 };
 
-// Delete config
+
 const deleteConfig = async (title) => {
   if (!title) throw new Error("title is required");
 
@@ -135,6 +93,51 @@ const deleteConfig = async (title) => {
 
   return { success: true };
 };
+
+
+// ================= QUERIES =================
+const buildQueryFromConfig = (config) => {
+  const baseQuery = { event_type: config.event_type, ...config.extra_query };
+
+  const fields = { _id: 0, time_stamp: 1, user_name: 1 };
+  if (config.mode === "session") {
+    fields.event_number = 1;
+    fields.session_id = 1;
+  }
+  if (config.mode === "event") {
+    fields.employee_type = 1;
+  }
+
+  if (Array.isArray(config.payload_field)) {
+    config.payload_field.forEach(f => fields[`payload.${f}`] = 1);
+  } else {
+    fields[`payload.${config.payload_field}`] = 1;
+  }
+
+  return { [config.title]: { query: baseQuery, fields, description: config.description } };
+};
+
+
+const getConfigQuery = async (title) => {
+  if (!title) throw new Error("title is required");
+
+  const db = await connectConfigDB();
+  const collection = db.collection(COLLECTION);
+
+  const config = await collection.findOne({ title });
+  if (!config) throw new Error("Config not found");
+
+  return buildQueryFromConfig(config);
+};
+
+
+const getRawConfig = async (title) => {
+  const db = await connectConfigDB();
+  const collection = db.collection(COLLECTION);
+  return await collection.findOne({ title }, { projection: { _id: 0 } });
+};
+
+
 
 export { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig };
 

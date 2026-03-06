@@ -6,7 +6,7 @@ const getSessionType = async () => {
   const db = await connectConfigDB();
   const collection = db.collection(COLLECTION);
 
-  // Fetch only configs where mode = "event"
+
   const configs = await collection
     .find(
       { mode: "session" },
