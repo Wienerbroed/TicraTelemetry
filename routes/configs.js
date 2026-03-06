@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from '../Database/configManager.js';
+import { createConfig, getConfigQuery, getRawConfig, listConfigs, updateConfig, deleteConfig } from '../database/configManager.js';
 import { asyncHandler, processFile } from './utils.js';
 
 const router = express.Router();

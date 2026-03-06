@@ -1,6 +1,6 @@
 import express from 'express';
-import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from '../Database/datapool.js';
-import { getRawConfig } from '../Database/configManager.js';
+import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from '../database/datapool.js';
+import { getRawConfig } from '../database/configManager.js';
 import { asyncHandler, requireQueryParams } from './utils.js';
 
 const router = express.Router();
