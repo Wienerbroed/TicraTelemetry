@@ -1,4 +1,4 @@
-// ---------------------------- NEW TIMELINE FUNCTION ----------------------------
+// ---------------------------- UPDATED TIMELINE FUNCTION ----------------------------
 export async function loadTimeline(sessionId) {
     const timelineContainer = document.getElementById('timelineContainer');
     const timelineDiv = document.getElementById('timeline');
@@ -8,8 +8,15 @@ export async function loadTimeline(sessionId) {
 
     timelineContainer.style.display = 'block';
     timelineDiv.innerHTML = timelineLegend.innerHTML = timelineSummary.innerHTML = '';
-    const colorMap={};
     timelineDiv.style.position = 'relative';
+    timelineDiv.style.display = 'flex';
+    timelineDiv.style.alignItems = 'flex-start';
+
+    const colorMap = {};
+    let zoomFactor = 1;
+    const ZOOM_STEP = 0.2;
+    const MIN_ZOOM = 0.5;
+    const MAX_ZOOM = 10;
 
     try {
         const response = await fetch(`/sessionTimeline?sessionId=${sessionId}`);
@@ -45,6 +52,8 @@ export async function loadTimeline(sessionId) {
         const timelineTotalWidth = Math.max(data.timeline.length * 50, MIN_TOTAL_WIDTH);
 
         const tabEventMap = {};
+
+        // Create Tabpage boxes
         data.timeline.forEach(ev => {
             if (ev.event_type === 'Tabpage') {
                 const box = document.createElement('div');
@@ -56,6 +65,9 @@ export async function loadTimeline(sessionId) {
                 const width = Math.max((ev.durationSeconds / totalDuration) * timelineTotalWidth, 20);
                 box.style.width = width + 'px';
                 box.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#666';
+                box.style.position = 'relative';
+                box.style.marginRight = '2px';
+                box.style.flexShrink = 0;
 
                 const text = document.createElement('div');
                 text.className = 'tabpage-text';
@@ -78,6 +90,7 @@ export async function loadTimeline(sessionId) {
             }
         });
 
+        // Create lines for other events
         data.timeline.forEach(ev => {
             if (ev.event_type !== 'Tabpage') {
                 const tabEvent = data.timeline.slice(0, data.timeline.indexOf(ev)).reverse().find(e => e.event_type === 'Tabpage');
@@ -89,17 +102,22 @@ export async function loadTimeline(sessionId) {
                 line.className = 'event-line';
                 line.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#333';
                 line.style.position = 'absolute';
-
-                const boxWidth = parentBox.offsetWidth;
-                const boxStartTime = new Date(tabEvent.time_stamp).getTime();
-                const boxEndTime = boxStartTime + tabEvent.durationSeconds * 1000;
-                const eventTime = new Date(ev.time_stamp).getTime();
-                const percent = Math.min(Math.max((eventTime - boxStartTime) / (boxEndTime - boxStartTime), 0), 1);
-
-                line.style.left = `${parentBox.offsetLeft + percent * boxWidth}px`;
-                line.style.top = `-50px`;
-                line.style.width = '2px';
+                line.style.width = '2px'; // fixed width
                 line.style.height = `${parentBox.offsetHeight + 50}px`;
+                line.parentBoxRef = parentBox; // store reference
+                line.dataset.eventTime = new Date(ev.time_stamp).getTime();
+
+                line.style.top = `-50px`;
+
+                const updateLinePosition = () => {
+                    const boxWidth = parentBox.offsetWidth * zoomFactor;
+                    const boxStartTime = parseInt(parentBox.dataset.startTime, 10);
+                    const boxEndTime = boxStartTime + parseInt(parentBox.dataset.durationSeconds, 10) * 1000;
+                    const percent = Math.min(Math.max((line.dataset.eventTime - boxStartTime) / (boxEndTime - boxStartTime), 0), 1);
+                    line.style.left = `${parentBox.offsetLeft * zoomFactor + percent * boxWidth}px`;
+                };
+
+                updateLinePosition(); // initial position
 
                 line.addEventListener('mouseenter', e => {
                     tooltip.style.display = 'block';
@@ -115,6 +133,7 @@ export async function loadTimeline(sessionId) {
             }
         });
 
+        // Create legend
         const grouped = {};
         Object.keys(colorMap).forEach(key => {
             const [type, payloadStr] = key.split(/-(.+)/);
@@ -147,33 +166,48 @@ export async function loadTimeline(sessionId) {
 
         timelineContainer.scrollIntoView({ behavior: 'smooth' });
 
+        // Zoom functions
+        const applyZoom = () => {
+            timelineDiv.style.transform = `scaleX(${zoomFactor})`;
+            timelineDiv.style.transformOrigin = 'left center';
+
+            // reposition lines
+            document.querySelectorAll('.event-line').forEach(line => {
+                const parentBox = line.parentBoxRef;
+                const boxWidth = parentBox.offsetWidth * zoomFactor;
+                const boxStartTime = parseInt(parentBox.dataset.startTime, 10);
+                const boxEndTime = boxStartTime + parseInt(parentBox.dataset.durationSeconds, 10) * 1000;
+                const percent = Math.min(Math.max((line.dataset.eventTime - boxStartTime) / (boxEndTime - boxStartTime), 0), 1);
+                line.style.left = `${parentBox.offsetLeft * zoomFactor + percent * boxWidth}px`;
+            });
+        };
+
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            zoomFactor = Math.min(zoomFactor + ZOOM_STEP, MAX_ZOOM);
+            applyZoom();
+        });
+
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            zoomFactor = Math.max(zoomFactor - ZOOM_STEP, MIN_ZOOM);
+            applyZoom();
+        });
+
+        document.getElementById('zoomResetBtn').addEventListener('click', () => {
+            zoomFactor = 1;
+            applyZoom();
+        });
+
     } catch (err) {
         console.error("Failed to load timeline:", err);
         timelineSummary.innerHTML = '<p>Unable to load timeline.</p>';
     }
 
-    function getColor(eventType,payload){ const key=payload?`${eventType}-${JSON.stringify(payload)}`:`${eventType}-null`; if(!colorMap[key]){ const hue=(Object.keys(colorMap).length*100)%360; colorMap[key]=payload?`hsl(${hue},50%,40%)`:"#888"; } return colorMap[key]; }
+    function getColor(eventType, payload){
+        const key = payload ? `${eventType}-${JSON.stringify(payload)}` : `${eventType}-null`;
+        if(!colorMap[key]){
+            const hue = (Object.keys(colorMap).length * 100) % 360;
+            colorMap[key] = payload ? `hsl(${hue},50%,40%)` : "#888";
+        }
+        return colorMap[key];
+    }
 }
-
-const timelineDiv = document.getElementById('timeline');
-let zoomFactor = 1;
-const ZOOM_STEP = 0.2;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 3;
-
-document.getElementById('zoomInBtn').addEventListener('click', () => {
-    zoomFactor = Math.min(zoomFactor + ZOOM_STEP, MAX_ZOOM);
-    timelineDiv.style.transform = `scaleX(${zoomFactor})`;
-    timelineDiv.style.transformOrigin = 'left center';
-});
-
-document.getElementById('zoomOutBtn').addEventListener('click', () => {
-    zoomFactor = Math.max(zoomFactor - ZOOM_STEP, MIN_ZOOM);
-    timelineDiv.style.transform = `scaleX(${zoomFactor})`;
-    timelineDiv.style.transformOrigin = 'left center';
-});
-
-document.getElementById('zoomResetBtn').addEventListener('click', () => {
-    zoomFactor = 1;
-    timelineDiv.style.transform = `scaleX(1)`;
-});

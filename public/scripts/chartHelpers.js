@@ -1,4 +1,6 @@
 // chartHelpers.js
+import { getColorForType } from './colors.js';
+
 export function renderBarChart(canvas, labels, data, colors, options={}) {
     if(canvas.chartInstance) canvas.chartInstance.destroy();
     canvas.chartInstance = new Chart(canvas, {
@@ -8,7 +10,7 @@ export function renderBarChart(canvas, labels, data, colors, options={}) {
     });
 }
 
-export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colors) {
+export function renderMultipleBarCharts(container, perUser, eventTypeOrder) {
     container.innerHTML = ''; 
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(4, 1fr)';
@@ -72,6 +74,9 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colo
                 displayData = totals;
             }
 
+            // Use consistent colors per data type
+            const colors = selections.map(s => getColorForType(s.split('::')[1]));
+
             renderBarChart(
                 canvas,
                 selections.map(s => s.split('::')[1]),
@@ -93,7 +98,6 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colo
                     },
                     layout: { padding: { top: 10, bottom: 5 } },
                     interaction: { mode: 'index', axis: 'x', intersect: false },
-                    
                     plugins: { legend: { display: false } },
                 }
             );
@@ -103,4 +107,3 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colo
         renderChart();
     });
 }
-

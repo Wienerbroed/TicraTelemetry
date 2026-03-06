@@ -1,5 +1,6 @@
-// scripts/sessionCharts.js
-import { renderBarChart, COLORS } from './utils.js';
+// sessionCharts.js
+import { renderBarChart } from './chartHelpers.js';
+import { getColorForType } from './colors.js';
 
 export function renderSessionCharts(STATE, perUser, tabs, columns, selectedEmployee=null, isType=false) {
     const chartContainer = document.getElementById('multiChartContainer');
@@ -27,7 +28,6 @@ export function renderSessionCharts(STATE, perUser, tabs, columns, selectedEmplo
         toggleWrapper.style.margin = '5px 0';
         toggleWrapper.innerHTML = `<input type="checkbox"> Show as %`;
         chartWrapper.appendChild(toggleWrapper);
-
         const percentageCheckbox = toggleWrapper.querySelector('input');
 
         const canvas = document.createElement('canvas');
@@ -41,7 +41,8 @@ export function renderSessionCharts(STATE, perUser, tabs, columns, selectedEmplo
             const labels = tabs;
             let data = tabs.map(tab => {
                 if (selectedEmployee && !isType) {
-                    return STATE.fullSessions.filter(s => s.session_id === col && s.tab === tab)
+                    return STATE.fullSessions
+                        .filter(s => s.session_id === col && s.tab === tab)
                         .reduce((a, b) => a + b.durationSeconds, 0);
                 } else {
                     return perUser[col]?.filter(s => s.tab === tab).reduce((a, b) => a + b.durationSeconds, 0) || 0;
@@ -53,7 +54,9 @@ export function renderSessionCharts(STATE, perUser, tabs, columns, selectedEmplo
                 data = data.map(d => (d / total * 100).toFixed(2));
             }
 
-            renderBarChart(canvas, labels, data, COLORS.slice(0, labels.length), {
+            const colors = labels.map(label => getColorForType(label));
+
+            renderBarChart(canvas, labels, data, colors, {
                 responsive: true,
                 animation: false,
                 maintainAspectRatio: false,
