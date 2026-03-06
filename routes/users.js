@@ -1,8 +1,8 @@
 import express from 'express';
-import { getEventType } from '../Database/eventTypes.js';
-import { getSessionType } from '../Database/session.js';
-import { getUsers, getEmployeeTypes } from '../Database/user.js';
-import { getEventQueries } from '../Database/eventQueries.js';
+import { getEventType } from '../database/eventTypes.js';
+import { getSessionType } from '../database/session.js';
+import { getUsers, getEmployeeTypes } from '../database/user.js';
+import { getEventQueries } from '../database/eventQueries.js';
 import { asyncHandler } from './utils.js';
 
 const router = express.Router();

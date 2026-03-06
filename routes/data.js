@@ -1,5 +1,5 @@
 import express from 'express';
-import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from '../Database/datapool.js';
+import { fetchDataPoolByQueries, sessionFetchByQueries, sessionTimeline } from '../database/datapool.js';
 import { getRawConfig } from '../Database/configManager.js';
 import { asyncHandler, requireQueryParams } from './utils.js';
 
