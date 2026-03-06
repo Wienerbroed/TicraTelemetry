@@ -11,7 +11,7 @@ export function renderBarChart(canvas, labels, data, colors, options={}) {
 export function renderMultipleBarCharts(container, perUser, eventTypeOrder, colors) {
     container.innerHTML = ''; 
     container.style.display = 'grid';
-    container.style.gridTemplateColumns = 'repeat(2, 1fr)';
+    container.style.gridTemplateColumns = 'repeat(4, 1fr)';
     container.style.gap = '20px';
 
     eventTypeOrder.forEach((eventType, idx) => {

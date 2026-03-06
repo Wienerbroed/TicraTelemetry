@@ -1,7 +1,7 @@
 // scripts/sessionTable.js
 import { createCell, applyStickyColumns, formatSecondsToHMS, sortTableByRow } from './utils.js';
 
-export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, isType=false) {
+export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null, isType = false) {
     const table = document.getElementById('bigTable');
     const thead = table.querySelector('thead');
     const tbody = table.querySelector('tbody');
@@ -12,7 +12,9 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
         ? [...new Set(STATE.fullSessions.map(s => s.session_id))].sort()
         : STATE.userOrder;
 
-    // Header row
+    // -------------------------
+    // Header Row
+    // -------------------------
     const headerRow = document.createElement('tr');
     ['Operation', 'AVERAGE', 'TOTAL', ...columns].forEach((text, idx) => {
         const th = document.createElement('th');
@@ -21,6 +23,7 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
 
         let displayText = text;
         let sessionIdForClick = text;
+
         if (selectedEmployee && !isType && idx >= 3) {
             const session = STATE.fullSessions.find(s => s.session_id === text);
             if (session) {
@@ -44,7 +47,9 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
     });
     thead.appendChild(headerRow);
 
-    // Heatmap color calculation
+    // -------------------------
+    // Heatmap calculation
+    // -------------------------
     const columnMax = {};
     columns.forEach(col => {
         let maxVal = 0;
@@ -69,7 +74,9 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
         return { bg: `hsl(${hue},70%,${lightness}%)`, color: intensity > 0.6 ? '#fff' : '#000' };
     }
 
-    // Rows
+    // -------------------------
+    // Table Rows
+    // -------------------------
     for (const tab of tabs) {
         const tr = document.createElement('tr');
         tr.dataset.tab = tab;
@@ -78,24 +85,54 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
         const opCell = createCell(tab, false, null, 'operation-cell');
         tr.appendChild(opCell);
 
-        // Tooltip
-        opCell.addEventListener('mouseenter', async () => {
+        // Tooltip above and right of mouse
+        opCell.addEventListener('mouseenter', async (e) => {
             const tooltip = document.getElementById('tooltip');
             tooltip.style.display = 'block';
             tooltip.innerHTML = '';
+
             const configTitle = document.getElementById('eventTypeSelect').value || tab;
             if (window.loadDescriptionTooltip) await window.loadDescriptionTooltip(configTitle);
-            const rect = opCell.getBoundingClientRect();
-            tooltip.style.top = `${rect.top - tooltip.offsetHeight - 6 + window.scrollY}px`;
-            tooltip.style.left = `${rect.right - tooltip.offsetWidth + window.scrollX}px`;
+
+            const offsetX = 12;
+            const offsetY = 12;
+
+            let left = e.pageX + offsetX;
+            let top = e.pageY - tooltip.offsetHeight - offsetY;
+            if (top < window.scrollY) top = e.pageY + offsetY;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
         });
-        opCell.addEventListener('mouseleave', () => { 
+
+        opCell.addEventListener('mousemove', (e) => {
+            const tooltip = document.getElementById('tooltip');
+            const offsetX = 12;
+            const offsetY = 12;
+
+            let left = e.pageX + offsetX;
+            let top = e.pageY - tooltip.offsetHeight - offsetY;
+            if (top < window.scrollY) top = e.pageY + offsetY;
+
+            tooltip.style.left = `${left}px`;
+            tooltip.style.top = `${top}px`;
+        });
+
+        opCell.addEventListener('mouseleave', () => {
             const tooltip = document.getElementById('tooltip');
             tooltip.style.display = 'none';
         });
 
-        tr.addEventListener('mouseenter', () => { opCell.style.backgroundColor = 'rgba(252,199,93,0.5)'; opCell.style.fontWeight = 'bold'; });
-        tr.addEventListener('mouseleave', () => { opCell.style.backgroundColor = ''; opCell.style.fontWeight = ''; });
+        // Row hover highlight
+        tr.addEventListener('mouseenter', () => { 
+            opCell.style.backgroundColor = 'rgba(252,199,93,0.5)'; 
+            opCell.style.fontWeight = 'bold'; 
+        });
+        tr.addEventListener('mouseleave', () => { 
+            opCell.style.backgroundColor = ''; 
+            opCell.style.fontWeight = ''; 
+        });
+
         tr.addEventListener('click', () => sortTableByRow(table, tr, STATE.rowSortStates, 3));
 
         const totalsArray = columns.map(col => {
@@ -125,9 +162,14 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
         tbody.appendChild(tr);
     }
 
+    // -------------------------
+    // Apply sticky first column
+    // -------------------------
     applyStickyColumns(table, 3);
 
-    // Column and row resizing
+    // -------------------------
+    // Column & row resizing
+    // -------------------------
     makeColumnsResizable(table);
     makeRowsResizable(table);
 
@@ -138,16 +180,23 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
             th.appendChild(resizer);
+
             let startX, startWidth;
             resizer.addEventListener('mousedown', e => {
                 e.stopPropagation();
                 startX = e.pageX; startWidth = th.offsetWidth;
+
                 function onMouseMove(e) {
                     const newWidth = Math.max(40, startWidth + (e.pageX - startX));
                     th.style.width = newWidth + 'px';
                     table.querySelectorAll(`tr td:nth-child(${colIndex + 1})`).forEach(td => td.style.width = newWidth + 'px');
                 }
-                function onMouseUp() { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
             });
@@ -160,15 +209,25 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee=null, 
             const firstCell = row.querySelector("td");
             if (!firstCell || firstCell.querySelector('.row-resizer')) return;
             firstCell.style.position = "relative";
+
             const resizer = document.createElement('div');
             resizer.className = 'row-resizer';
             firstCell.appendChild(resizer);
+
             let startY, startHeight;
             resizer.addEventListener('mousedown', e => {
                 e.stopPropagation();
                 startY = e.pageY; startHeight = row.offsetHeight;
-                function onMouseMove(e) { row.style.height = Math.max(24, startHeight + (e.pageY - startY)) + 'px'; }
-                function onMouseUp() { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); }
+
+                function onMouseMove(e) {
+                    row.style.height = Math.max(24, startHeight + (e.pageY - startY)) + 'px';
+                }
+
+                function onMouseUp() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                }
+
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
             });

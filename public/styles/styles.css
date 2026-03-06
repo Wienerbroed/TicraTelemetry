@@ -8,10 +8,16 @@ body {
   padding-top: 65px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  overflow-x: hidden;
+  align-items: flex-start;
+  overflow-x: auto;
   background: #ffffff;
+  padding-left: 0;          /* remove body padding to keep header/footer full width */
+  box-sizing: border-box;
 }
+
+/* =========================
+   HEADER AND FOOTER
+========================= */
 
 header {
   width: 100vw;
@@ -34,6 +40,15 @@ footer {
   line-height: 25px;
 }
 
+/* =========================
+   LEFT PADDING FOR ALL CONTENT EXCEPT HEADER/FOOTER
+========================= */
+
+body > *:not(header):not(footer):not(#tableContainerWrapper) {
+  padding-left: 20px;  /* left-align content */
+  width: 100%;
+  box-sizing: border-box;
+}
 
 /* =========================
    NAVBAR
@@ -61,7 +76,6 @@ footer {
   max-height: 28px;
 }
 
-
 /* =========================
    FILTERS
 ========================= */
@@ -69,11 +83,11 @@ footer {
 #filters {
   width: 95%;
   max-width: 1200px;
-  margin: 10px auto;
+  margin: 10px 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
 }
 
 .checkbox-group {
@@ -88,6 +102,19 @@ footer {
   gap: 4px;
 }
 
+/* =========================
+   LEFT STICKY WRAPPER
+========================= */
+
+.left-sticky-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky; /* keep left edge visible on horizontal scroll */
+  left: 0;
+  z-index: 200;
+}
 
 /* =========================
    TABLE WRAPPER
@@ -100,10 +127,9 @@ footer {
 
 #tableContainer {
   width: fit-content;
-  margin: 0 auto;
+  margin: 0;               /* remove centering */
   border-left: 3px solid #444;
 }
-
 
 /* =========================
    TABLE STRUCTURE
@@ -117,26 +143,23 @@ footer {
 
 /* LEFT ALIGN ONLY OPERATION CELLS */
 #bigTable td.operation-cell {
-    text-align: left !important;
-    padding-left: 8px;             
-    font-size: 12px;
-    max-width: 15ch;
-    overflow: hidden;
-    white-space: nowrap;
-    text-align: center;
-    border-right: 2px solid #555;
-    border-bottom: 2px solid #555;
+  text-align: left !important;
+  padding-left: 8px;             
+  font-size: 12px;
+  max-width: 15ch;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 2px solid #555;
+  border-bottom: 2px solid #555;
 }
 
 /* KEEP HEADER FIRST CELL CENTERED */
 #bigTable th:first-child div {
-    text-align: center !important;
-    font-size: 12px;
-    white-space: nowrap;
-    text-align: center;
-    background-color: inherit;
+  text-align: center !important;
+  font-size: 12px;
+  white-space: nowrap;
+  background-color: inherit;
 }
-
 
 th, td {
   padding: 2px;
@@ -159,7 +182,6 @@ td:first-child {
   border-left: 2px solid #555;
 }
 
-
 /* =========================
    HEADER ROW (Sticky Top)
 ========================= */
@@ -170,7 +192,6 @@ thead th {
   z-index: 300;
   cursor: pointer;
 }
-
 
 /* =========================
    ROTATED HEADERS
@@ -187,59 +208,46 @@ th.rotate > div {
   box-sizing: border-box;
 }
 
-
 /* =========================
    STICKY COLUMNS
 ========================= */
 
-tbody td.sticky {
+tbody td.sticky,
+table#bigTable th.sticky,
+table#bigTable td.operation-cell {
   position: sticky;
-  z-index: 150;
-}
-
-thead th.sticky {
-  position: sticky;
-  z-index: 400;
-}
-
-td.sticky,
-th.sticky {
+  left: 0;                /* make first column sticky */
+  z-index: 5;
+  background-color: #fff;
   box-shadow: 4px 0 4px -2px rgba(0, 0, 0, 0.25);
 }
-
 
 /* =========================
    ROW ALTERNATION PER EVENT TYPE
 ========================= */
 
-/* Alternate only NON-summary cells */
-
 /* White rows */
 tr.eventtype-white td.operation-cell {
-    background-color: #ffffff !important;
+  background-color: #ffffff !important;
 }
 
 tr.eventtype-grey td.operation-cell {
-    background-color: #dcdcdc !important;
+  background-color: #dcdcdc !important;
 }
 
 /* Preserve hover highlight */
 tr.sortable:hover td.operation-cell {
-    background-color: rgba(252, 199, 93, 0.5) !important;
-    font-weight: bold;
+  background-color: rgba(252, 199, 93, 0.5) !important;
+  font-weight: bold;
 }
 
-
 /* =========================
-   SUMMARY COLUMNS
-   (MOST USED / AVERAGE / TOTAL)
+   SUMMARY CELLS
 ========================= */
 
 td.summary-cell {
   background-color: #dbeeff !important;
-  
 }
-
 
 /* =========================
    HEATMAP (MAX PER EVENT TYPE)
@@ -262,92 +270,67 @@ td.heatmap-second {
 ========================= */
 
 td.user-cell {
-    background-color: var(--cell-bg, white);
-    transition: background-color 0.2s;
+  background-color: var(--cell-bg, white);
+  transition: background-color 0.2s;
 }
 
-/* Hover on the row */
-/* Highlight first column AND summary cells */
 tr.sortable:hover td.operation-cell,
 tr.sortable:hover td.summary-cell {
-    background-color: rgba(252, 199, 93, 0.5) !important;
-    font-weight: bold;
+  background-color: rgba(252, 199, 93, 0.5) !important;
+  font-weight: bold;
 }
 
-
-
 /* =========================
-   CHART CONTAINER
+   CHART CONTAINERS
 ========================= */
 
 #totalChartContainer {
   margin-top: 20px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start; /* align left */
   width: 80%;
   max-width: 800px;
   height: 300px;
 }
+
 #multiChartContainer {
   display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 charts per row */
   gap: 20px;
   width: 95%;
-  max-width: 1200px;
-  margin: 20px auto;
+  max-width: 2400px;
+  margin: 20px 0;
 }
 
 #multiChartContainer canvas {
   width: 100% !important;
   height: 300px !important;
 }
-#filters {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start; 
-    gap: 16px;
-}
 
-.filter-block {
-    width: 100%;               
-}
+/* =========================
+   FILTERS AND BUTTONS
+========================= */
 
 #applyButton {
-    margin-top: 10px;
+  align-self: flex-start; 
+  margin-top: 10px;
 }
 
-#applyButton {
-    align-self: flex-start; 
-    margin-top: 10px;
-}
-
-th {
-    position: relative;
-}
-
-.download-icon {
-    position: absolute;
-    top: 4px;
-    right: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    opacity: 0.6;
-}
-
-.download-icon:hover {
-    opacity: 1;
-    transform: scale(1.1);
-}
 #downloadBtn {
-    margin: 20px auto;
-    padding: 4px 8px;
-    font-size: 14px;
-    cursor: pointer;
-    display: none;
+  margin: 20px 0;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  display: none;
 }
 
 #downloadBtn:hover {
-    opacity: 0.85;
+  opacity: 0.85;
 }
+
+/* =========================
+   TOOLTIP
+========================= */
 
 .tooltip {
   position: absolute;
@@ -361,47 +344,63 @@ th {
   display: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
+
 .tooltip img {
   max-width: 500px;
   max-height: 300px;
   display: block;
   margin-top: 4px;
 }
-/* Column resizer */
+
+/* =========================
+   COLUMN AND ROW RESIZERS
+========================= */
+
 th .col-resizer {
   position: absolute;
   top: 0;
   right: 0;
-  width: 5px;          /* draggable area width */
+  width: 5px;
   height: 100%;
   cursor: col-resize;
   user-select: none;
   z-index: 10;
 }
 
-/* Row resizer */
 td .row-resizer {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 5px;         /* draggable area height */
+  height: 5px;
   cursor: row-resize;
   user-select: none;
   z-index: 10;
 }
 
-/* Visual hover indicator */
 th .col-resizer:hover,
 td .row-resizer:hover {
   background-color: rgba(0, 0, 0, 0.2);
 }
 
-/* Make first column sticky without affecting initial size */
-table#bigTable th.sticky,
-table#bigTable td.operation-cell {
-  position: sticky;
-  left: 0;
-  z-index: 5;
-  background-color: #fff;
+/* =========================
+   DOWNLOAD ICONS
+========================= */
+
+th {
+  position: relative;
+}
+
+.download-icon {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.download-icon:hover {
+  opacity: 1;
+  transform: scale(1.1);
 }

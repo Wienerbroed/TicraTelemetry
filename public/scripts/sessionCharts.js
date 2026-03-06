@@ -5,7 +5,7 @@ export function renderSessionCharts(STATE, perUser, tabs, columns, selectedEmplo
     const chartContainer = document.getElementById('multiChartContainer');
     chartContainer.innerHTML = '';
     chartContainer.style.display = 'grid';
-    chartContainer.style.gridTemplateColumns = 'repeat(2,1fr)';
+    chartContainer.style.gridTemplateColumns = 'repeat(4,1fr)';
     chartContainer.style.gap = '20px';
 
     columns.forEach(col => {
