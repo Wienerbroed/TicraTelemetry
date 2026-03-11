@@ -41,7 +41,7 @@ const mockSessionEvents = [
   }
 ];
 
-vi.mock("../database/db.js", () => {
+vi.mock("../../database/db.js", () => {
   const mockCollection = {
     aggregate: vi.fn((pipeline) => {
       const matchStage = pipeline.find(stage => stage.$match)?.$match;
@@ -90,7 +90,7 @@ vi.mock("fs/promises", () => ({
 }));
 
 // ----------------- IMPORTS -----------------
-import { dbCollection } from "../database/db.js";
+import { dbCollection } from "../../database/db.js";
 import { readFile } from "fs/promises";
 
 // ----------------- FUNCTIONS UNDER TEST -----------------

@@ -1,6 +1,6 @@
 import { vi, describe, it, expect } from "vitest";
 
-vi.mock("../database/db.js", () => ({
+vi.mock("../../database/db.js", () => ({
   connectConfigDB: vi.fn(async () => ({
     collection: vi.fn(() => ({
       find: vi.fn(() => ({
@@ -16,7 +16,7 @@ vi.mock("../database/db.js", () => ({
   }))
 }));
 
-import { getEventQueries } from "../database/eventQueries.js";
+import { getEventQueries } from "../../database/eventQueries.js";
 
 describe("getEventQueries", () => {
   it("returns event types from queries config", async () => {
