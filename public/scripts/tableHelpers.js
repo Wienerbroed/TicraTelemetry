@@ -202,7 +202,7 @@ export function attachSortableRows(table, sortState){
 }
 
 export function makeColumnsResizable(table) {
-    const headers = table.querySelectorAll('th');
+    const headers = table.querySelectorAll('td');
 
     headers.forEach(th => {
         th.classList.add('resizable');

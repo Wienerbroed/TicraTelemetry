@@ -62,7 +62,15 @@
       <tbody></tbody>
     </table>
   </div>
+
+  <!-- Download button -->
+
 </div>
+  <div>
+    <button id="downloadBtn" type="button" title="Download CSV">
+      Download Excel
+    </button>
+  </div>
 
 <div id="timelineContainer" style="display:none; margin:20px 0;">
   <h3>Session Timeline</h3>
@@ -103,15 +111,12 @@ const tooltip = document.getElementById('tooltip');
 window.loadTimeline = loadTimeline;
 
 // Download button
-const downloadBtn = document.createElement('span');
-downloadBtn.id = 'downloadBtn';
-downloadBtn.innerHTML = '<img src="/images/Excel-Logo.png" alt="Excel" width="100">';
-downloadBtn.title = 'Download CSV';
-downloadBtn.addEventListener('click', () => { downloadTableCSV(); });
-document.getElementById('tableContainerWrapper').appendChild(downloadBtn);
+const downloadBtn = document.getElementById('downloadBtn');
+downloadBtn.addEventListener('click', () => downloadTableCSV());
 
+// Function to toggle download button visibility
 function toggleDownloadButton(show) { 
-    downloadBtn.style.display = show ? 'block' : 'none'; 
+    downloadBtn.style.display = show ? 'inline-block' : 'none'; 
 }
 
 // Set default date range

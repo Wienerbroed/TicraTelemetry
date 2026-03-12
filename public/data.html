@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="styles/styles.css">
 <link rel="stylesheet" href="styles/data.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script type="module" src="scripts/utils.js"></script>
+
 </head>
 <body>
 
@@ -56,14 +56,15 @@
     </table>
   </div>
 </div>
-  <button id="downloadBtn" type="button" title="Download CSV">
-    <img src="/images/Excel-Logo.png" alt="Excel" width="80">
-  </button>
+
+<div>
+  <button id="downloadBtn" type="button" title="Download CSV">Download excel</button>
+</div>
+
 <div id="multiChartContainer"></div>
 
+<!-- Tooltip element only for event type hover -->
 <div id="tooltip" class="tooltip"></div>
-
-<footer>© TICRA foundation</footer>
 
 <script type="module">
 import { 
@@ -74,17 +75,64 @@ import {
 const STATE = { fullEvents: [], activeUsers: [], userOrder: [], rowSortStates: {}, eventTypeOrder: [], allEmployeeTypes: [] };
 setDefaultDateRange('startDate','endDate',10);
 
-const tooltip = document.getElementById('tooltip');
+const tooltip = document.getElementById('tooltip'); 
 
 async function loadEventTypes() {
   const data = await fetchJson('/eventQueries');
   const container = document.getElementById('eventTypeGroup');
   container.innerHTML = '';
-  data.forEach(ev => {
+
+  data.forEach(async (ev) => {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('checkbox-container');
+
     const label = document.createElement('label');
-    const input = document.createElement('input'); input.type='checkbox'; input.value=ev;
-    label.appendChild(input); label.appendChild(document.createTextNode(ev));
-    container.appendChild(label);
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.value = ev;
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(ev));
+
+    const config = await fetchJson(`/api/configs/${encodeURIComponent(ev)}`).catch(() => null);
+    const description = config?.description ?? '';
+    const imgSrc = config?.extra_query?.image?.data
+      ? `data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}`
+      : null;
+
+    function showTooltip() {
+      tooltip.innerHTML = '';
+      if(ev) {
+        const p = document.createElement('p'); 
+        p.textContent = ev; 
+        p.classList.add('title'); 
+        tooltip.appendChild(p);
+      }
+      if(description){
+        const p = document.createElement('p'); 
+        p.textContent = description; 
+        p.classList.add('description'); 
+        tooltip.appendChild(p);
+      }
+      if(imgSrc){
+        const img=document.createElement('img'); 
+        img.src=imgSrc; 
+        tooltip.appendChild(img);
+      }
+      const rect = label.getBoundingClientRect(); // position relative to label
+      tooltip.style.top = `${rect.bottom + 10 + window.scrollY}px`;
+      tooltip.style.left = `${rect.left + window.scrollX}px`;
+      tooltip.style.display = 'block';
+    }
+
+    function hideTooltip() {
+      tooltip.style.display = 'none';
+    }
+
+    label.addEventListener('mouseenter', showTooltip);
+    label.addEventListener('mouseleave', hideTooltip);
+
+    wrapper.appendChild(label);
+    container.appendChild(wrapper);
   });
 }
 
@@ -95,8 +143,12 @@ async function loadEmployeeTypes() {
   container.innerHTML = '';
   STATE.allEmployeeTypes.forEach(emp=>{
     const label=document.createElement('label');
-    const input=document.createElement('input'); input.type='checkbox'; input.value=emp; input.classList.add('employee-checkbox');
-    label.appendChild(input); label.appendChild(document.createTextNode(emp));
+    const input=document.createElement('input'); 
+    input.type='checkbox'; 
+    input.value=emp; 
+    input.classList.add('employee-checkbox');
+    label.appendChild(input); 
+    label.appendChild(document.createTextNode(emp));
     container.appendChild(label);
   });
 }
@@ -111,63 +163,47 @@ function getCheckedValues(containerId){
   return Array.from(document.getElementById(containerId).querySelectorAll('input:checked')).map(i=>i.value);
 }
 
-function formatDate(date) {
-  return date.toISOString().split('T')[0];
-}
+function formatDate(date) { return date.toISOString().split('T')[0]; }
 
 function setPresetRange(range) {
   const startInput = document.getElementById('startDate');
   const endInput = document.getElementById('endDate');
   const today = new Date();
-
-  if (range === 'all') {
-    const fixedStart = new Date('2026-01-01');
-    startInput.value = formatDate(fixedStart);
-    endInput.value = formatDate(today);
-    return;
-  }
-
-  const past = new Date();
-  if (range === 30) past.setMonth(today.getMonth() - 1);
-  else past.setDate(today.getDate() - range);
-
-  startInput.value = formatDate(past);
-  endInput.value = formatDate(today);
+  if (range === 'all') { const fixedStart = new Date('2026-01-01'); startInput.value=formatDate(fixedStart); endInput.value=formatDate(today); return; }
+  const past = new Date(); if(range===30) past.setMonth(today.getMonth()-1); else past.setDate(today.getDate()-range);
+  startInput.value=formatDate(past); endInput.value=formatDate(today);
 }
 
-document.querySelectorAll('.preset-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
+document.querySelectorAll('.preset-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
     const range = btn.dataset.range;
-    setPresetRange(range === 'all' ? 'all' : parseInt(range));
+    setPresetRange(range==='all'?'all':parseInt(range));
   });
 });
 
-document.getElementById('applyButton').addEventListener('click', async () => {
+document.getElementById('applyButton').addEventListener('click', async ()=>{
   const selectedEventTypes = getCheckedValues('eventTypeGroup');
-  if (!selectedEventTypes.length) return;
+  if(!selectedEventTypes.length) return;
   const selectedEmployees = getCheckedEmployeeTypes();
   const startDate = document.getElementById('startDate').value;
   const endDate = document.getElementById('endDate').value;
 
   STATE.fullEvents = [];
   STATE.eventTypeOrder = [];
-  document.getElementById('queryBoxesContainer').innerHTML = '';
+  document.getElementById('queryBoxesContainer').innerHTML='';
 
-  for (const [idx, eventType] of selectedEventTypes.entries()) {
+  for(const eventType of selectedEventTypes){
     const params = new URLSearchParams();
     params.append('inputEventType', eventType);
-    if (startDate) params.append('startTime', startDate+'T00:00:00');
-    if (endDate) params.append('endTime', endDate+'T23:59:59');
-    if (selectedEmployees) selectedEmployees.forEach(emp => params.append('employeeType', emp));
-
+    if(startDate) params.append('startTime', startDate+'T00:00:00');
+    if(endDate) params.append('endTime', endDate+'T23:59:59');
+    if(selectedEmployees) selectedEmployees.forEach(emp=>params.append('employeeType', emp));
     const url = `/data?${params.toString()}`;
     const data = await fetchJson(url);
 
-    const events = (data.events ?? []).map(ev => {
-      let selection = "unknown";
-      if (ev.payload && Object.keys(ev.payload).length) {
-        selection = String(Object.values(ev.payload)[0] ?? "unknown");
-      }
+    const events = (data.events ?? []).map(ev=>{
+      let selection="unknown";
+      if(ev.payload && Object.keys(ev.payload).length) selection=String(Object.values(ev.payload)[0] ?? "unknown");
       return { eventType, user: ev.user_name ?? "unknown", selection, employee_type: ev.employee_type ?? "unknown", count: ev.count ?? 0 };
     });
 
@@ -191,12 +227,9 @@ function buildPerUser(events){
   return perUser;
 }
 
-function getSelections(perUser){
-  return [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort();
-}
-
 const downloadBtn = document.getElementById('downloadBtn');
 downloadBtn.addEventListener('click',()=>downloadTableCSV());
+
 function renderTableAndCharts(){
   const perUser=buildPerUser(STATE.fullEvents);
   drawTable(perUser, STATE);
@@ -210,6 +243,8 @@ function renderTableAndCharts(){
 loadEventTypes();
 loadEmployeeTypes();
 </script>
+
+<footer>© TICRA foundation</footer>
 
 </body>
 </html>

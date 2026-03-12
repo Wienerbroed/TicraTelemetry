@@ -123,13 +123,13 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
             tooltip.style.display = 'none';
         });
 
-        // Row hover highlight
+        // Row hover highlight for operation cell only (solid color)
         tr.addEventListener('mouseenter', () => { 
-            opCell.style.backgroundColor = 'rgba(252,199,93,0.5)'; 
+            opCell.style.backgroundColor = '#fcc85d'; // solid highlight
             opCell.style.fontWeight = 'bold'; 
         });
         tr.addEventListener('mouseleave', () => { 
-            opCell.style.backgroundColor = ''; 
+            opCell.style.backgroundColor = ''; // revert to original
             opCell.style.fontWeight = ''; 
         });
 
@@ -174,22 +174,38 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
     makeRowsResizable(table);
 
     function makeColumnsResizable(table) {
-        const headers = table.querySelectorAll("thead th");
-        headers.forEach((th, colIndex) => {
-            if (th.querySelector('.col-resizer')) return;
+        const firstColCells = table.querySelectorAll("thead th:first-child, tbody td:first-child");
+
+        firstColCells.forEach(cell => {
+            if (cell.querySelector('.col-resizer')) return;
+
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
-            th.appendChild(resizer);
+
+            // Position resizer along the right edge of the cell
+            resizer.style.position = 'absolute';
+            resizer.style.top = 0;
+            resizer.style.right = 0;
+            resizer.style.width = '6px';       // easy to grab
+            resizer.style.height = '100%';
+            resizer.style.cursor = 'col-resize';
+
+            cell.style.position = 'relative';   // ensure parent is positioned
+            cell.appendChild(resizer);
 
             let startX, startWidth;
+
             resizer.addEventListener('mousedown', e => {
                 e.stopPropagation();
-                startX = e.pageX; startWidth = th.offsetWidth;
+                startX = e.pageX;
+                startWidth = cell.offsetWidth;
 
                 function onMouseMove(e) {
-                    const newWidth = Math.max(40, startWidth + (e.pageX - startX));
-                    th.style.width = newWidth + 'px';
-                    table.querySelectorAll(`tr td:nth-child(${colIndex + 1})`).forEach(td => td.style.width = newWidth + 'px');
+                    const newWidth = Math.max(80, startWidth + (e.pageX - startX));
+
+                    // Apply new width to all first-column cells
+                    table.querySelectorAll("thead th:first-child, tbody td:first-child")
+                        .forEach(td => td.style.width = newWidth + 'px');
                 }
 
                 function onMouseUp() {

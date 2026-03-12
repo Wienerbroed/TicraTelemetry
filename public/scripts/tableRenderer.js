@@ -11,7 +11,6 @@ export async function drawTable(perUser, STATE) {
   const table = document.getElementById('bigTable');
   const thead = table.querySelector('thead'); 
   const tbody = table.querySelector('tbody');
-  const tooltip = document.getElementById('tooltip');
   
   thead.innerHTML = ''; 
   tbody.innerHTML = '';
@@ -29,27 +28,44 @@ export async function drawTable(perUser, STATE) {
   thead.appendChild(headerRow);
 
   function makeColumnsResizable(table) {
-    const headers = table.querySelectorAll("thead th");
-    headers.forEach((th, colIndex) => {
+    const firstColCells = table.querySelectorAll("thead th:first-child, tbody td:first-child");
+
+    firstColCells.forEach(th => {
       if (th.querySelector('.col-resizer')) return;
+
       const resizer = document.createElement("div");
       resizer.classList.add("col-resizer");
+
+      // Position resizer along the right edge of the cell
+      resizer.style.position = "absolute";
+      resizer.style.top = 0;
+      resizer.style.right = 0;
+      resizer.style.width = "6px"; // easy to grab
+      resizer.style.height = "100%";
+      resizer.style.cursor = "col-resize";
+
+      th.style.position = "relative"; // ensure parent is positioned
       th.appendChild(resizer);
+
       let startX, startWidth;
+
       resizer.addEventListener("mousedown", (e) => {
         e.stopPropagation();
         startX = e.pageX;
         startWidth = th.offsetWidth;
+
         function onMouseMove(e) {
-          const newWidth = Math.max(40, startWidth + (e.pageX - startX));
-          th.style.width = newWidth + "px";
-          table.querySelectorAll(`tr td:nth-child(${colIndex + 1})`)
-            .forEach(td => td.style.width = newWidth + "px");
+          const newWidth = Math.max(80, startWidth + (e.pageX - startX));
+          // Set width on all cells in first column
+          table.querySelectorAll("thead th:first-child, tbody td:first-child")
+            .forEach(cell => cell.style.width = newWidth + "px");
         }
+
         function onMouseUp() {
           document.removeEventListener("mousemove", onMouseMove);
           document.removeEventListener("mouseup", onMouseUp);
         }
+
         document.addEventListener("mousemove", onMouseMove);
         document.addEventListener("mouseup", onMouseUp);
       });
@@ -88,12 +104,6 @@ export async function drawTable(perUser, STATE) {
 
   for (const eventType of STATE.eventTypeOrder) {
     const eventSelections = selections.filter(s => s.startsWith(eventType + '::'));
-    const config = await fetchJson(`/api/configs/${encodeURIComponent(eventType)}`).catch(() => null);
-    const description = config?.description ?? '';
-    const imgSrc = config?.extra_query?.image?.data
-      ? `data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}`
-      : null;
-
     const columnMax = {}; 
     STATE.userOrder.forEach(u => {
       let maxVal = 0; 
@@ -112,43 +122,6 @@ export async function drawTable(perUser, STATE) {
       const displayName = sel.split('::')[1];
       const opCell = createCell(displayName, false, null, 'operation-cell');
       tr.appendChild(opCell);
-
-      opCell.addEventListener('mouseenter', (e) => {
-        tooltip.innerHTML = ''; 
-        tooltip.style.display = 'block';
-        if (eventType) {
-          const titleP = document.createElement('p');
-          titleP.textContent = eventType;
-          titleP.style.fontWeight = 'bold';
-          tooltip.appendChild(titleP);
-        }
-        if (description) { 
-          const p = document.createElement('p'); 
-          p.textContent = description; 
-          tooltip.appendChild(p); 
-        }
-        if (imgSrc) { 
-          const img = document.createElement('img'); 
-          img.src = imgSrc; 
-          tooltip.appendChild(img); 
-        }
-        const selP = document.createElement('p'); 
-        selP.textContent = displayName; 
-        tooltip.appendChild(selP);
-        const offsetY = 10; 
-        tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
-        tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 10}px`;
-      });
-
-      opCell.addEventListener('mousemove', (e) => {
-        const offsetY = 10;
-        tooltip.style.top = `${e.pageY - tooltip.offsetHeight - offsetY}px`;
-        tooltip.style.left = `${e.pageX - tooltip.offsetWidth / 100}px`;
-      });
-
-      opCell.addEventListener('mouseleave', () => { 
-        tooltip.style.display = 'none'; 
-      });
 
       const total = STATE.userOrder.reduce((sum, u) => sum + (perUser[u]?.[sel] ?? 0), 0);
       const avg = STATE.userOrder.length ? (total / STATE.userOrder.length).toFixed(2) : 0;
@@ -194,5 +167,3 @@ export async function drawTable(perUser, STATE) {
   makeColumnsResizable(table);
   makeRowsResizable(table);
 }
-
-
