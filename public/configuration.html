@@ -67,10 +67,13 @@
 <footer>© TICRA foundation</footer>
 
 <script>
+let selectedConfig = null;
+let originalTitle = null;
+
 document.addEventListener("DOMContentLoaded", async () => {
-  await fetchEventTypes();   // populate event type dropdown
-  await loadDropdowns();     // populate session/event config dropdowns
-  addDropdownListeners();    // attach change listeners
+  await fetchEventTypes();
+  await loadDropdowns();
+  addDropdownListeners();
   document.getElementById("createConfig").addEventListener("click", createNewConfig);
 });
 
@@ -116,7 +119,6 @@ async function loadDropdowns() {
       if(c.mode === "event") eventDropdown.appendChild(opt);
     });
 
-    // Keep selection if config is selected
     if(selectedConfig){
       if(selectedConfig.mode==="session") sessionDropdown.value = selectedConfig.title;
       if(selectedConfig.mode==="event") eventDropdown.value = selectedConfig.title;
@@ -155,7 +157,7 @@ async function showConfigInfo(title) {
         <div><label>Event Type:</label> <span>${config.event_type}</span></div>
         <div><label>Payload:</label> <span>${config.payload_field}</span></div>
         <div><label>Description:</label> <span>${config.description||""}</span></div>
-        ${config.extra_query?.image ? `<div><img src="data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}" style="max-width:200px;margin-top:10px;"></div>` : ""}
+        ${config.extra_query?.image ? `<div><img src="data:${config.extra_query.image.contentType};base64,${config.extra_query.image.data}" style="max-width:200px;margin-top:10px;" id="currentImage"></div>` : ""}
         <div style="margin-top:10px;">
           <button onclick="deleteConfig()">Delete</button>
           <button class="update-btn" onclick="enableUpdate()">Update</button>
@@ -164,7 +166,7 @@ async function showConfigInfo(title) {
   } catch(err){ console.error(err); }
 }
 
-/* ---------- CREATE / UPDATE / DELETE FUNCTIONS ---------- */
+/* ---------- CREATE CONFIG ---------- */
 async function createNewConfig(){
   const title = document.getElementById("newTitle").value.trim();
   const mode = document.getElementById("newMode").value;
@@ -187,7 +189,6 @@ async function createNewConfig(){
   const result = await res.json();
   if(!res.ok) return alert(result.error);
 
-  // reset form
   document.getElementById("newTitle").value="";
   document.getElementById("newPayload").value="";
   document.getElementById("newDescription").value="";
@@ -206,6 +207,83 @@ async function deleteConfig(){
   selectedConfig=null; originalTitle=null;
   document.getElementById("configInfoContainer").innerHTML="";
   await loadDropdowns();
+}
+
+/* ---------- ENABLE UPDATE ---------- */
+function enableUpdate() {
+  if (!selectedConfig) return;
+
+  const container = document.getElementById("configBlock");
+  container.innerHTML = `
+    <div><label>Title:</label> <input type="text" id="updateTitle" value="${selectedConfig.title}"></div>
+    <div><label>Mode:</label>
+      <select id="updateMode">
+        <option value="session" ${selectedConfig.mode==="session"?"selected":""}>session</option>
+        <option value="event" ${selectedConfig.mode==="event"?"selected":""}>event</option>
+      </select>
+    </div>
+    <div><label>Event Type:</label>
+      <select id="updateEventType"></select>
+    </div>
+    <div><label>Payload:</label> <input type="text" id="updatePayload" value="${selectedConfig.payload_field}"></div>
+    <div><label>Description:</label> <textarea id="updateDescription" rows="4" maxlength="200">${selectedConfig.description||""}</textarea></div>
+    <div>
+      <label>Current Image:</label>
+      ${selectedConfig.extra_query?.image ? `<div><img src="data:${selectedConfig.extra_query.image.contentType};base64,${selectedConfig.extra_query.image.data}" style="max-width:200px;margin-top:10px;" id="currentImage"></div>` : "No image"}
+    </div>
+    <div><label>Replace Image:</label> <input type="file" id="updateImage" accept="image/*"></div>
+    <div style="margin-top:10px;">
+      <button onclick="cancelUpdate()">Cancel</button>
+      <button class="update-btn" onclick="submitUpdate()">Save</button>
+    </div>
+  `;
+
+  // Populate event type dropdown
+  fetchEventTypes().then(types => {
+    const select = document.getElementById("updateEventType");
+    select.innerHTML = '<option value="" disabled>-- Select an event type --</option>';
+    types.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      if (t === selectedConfig.event_type) opt.selected = true;
+      select.appendChild(opt);
+    });
+  });
+}
+
+/* ---------- SUBMIT UPDATE ---------- */
+async function submitUpdate() {
+  const title = document.getElementById("updateTitle").value.trim();
+  const mode = document.getElementById("updateMode").value;
+  const event_type = document.getElementById("updateEventType").value;
+  const payload_field = document.getElementById("updatePayload").value.trim();
+  const description = document.getElementById("updateDescription").value.trim();
+  const imageInput = document.getElementById("updateImage");
+
+  if (!title || !mode || !event_type || !payload_field) return alert("All fields are required");
+
+  const formData = new FormData();
+  formData.append("title", title);
+  formData.append("mode", mode);
+  formData.append("event_type", event_type);
+  formData.append("payload_field", payload_field);
+  formData.append("description", description);
+  if (imageInput.files[0]) formData.append("image", imageInput.files[0]);
+
+  const res = await fetch(`/api/configs/${originalTitle}`, { method: "PUT", body: formData });
+  const result = await res.json();
+  if (!res.ok) return alert(result.error);
+
+  selectedConfig = null;
+  originalTitle = null;
+  document.getElementById("configInfoContainer").innerHTML = "";
+  await loadDropdowns();
+}
+
+/* ---------- CANCEL UPDATE ---------- */
+function cancelUpdate() {
+  showConfigInfo(selectedConfig.title);
 }
 </script>
 

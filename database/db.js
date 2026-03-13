@@ -35,6 +35,23 @@ const connectDB = async () => {
   }
 };
 
+const connectTestDb = async () => {
+  if(readDB) return readDB;
+
+  try {
+    readClient = new MongoClient(uri);
+    await readClient.connect();
+    readDB = readClient.db('tst_gui_event_db');
+
+    console.log('✅ Read DB connected');
+    return readDB;
+  } catch (err) {
+    console.error('❌ Read DB connection failed:', err.message);
+    process.exit(1);
+  }
+};
+
+
 // ================= WRITE CONNECTION =================
 const connectConfigDB = async () => {
   if (writeDB) return writeDB;
@@ -51,6 +68,24 @@ const connectConfigDB = async () => {
     process.exit(1);
   }
 };
+
+
+const connectTestConfigDB = async () => {
+  if (writeDB) return writeDB;
+
+  try {
+    writeClient = new MongoClient(writeUrl);
+    await writeClient.connect();
+    writeDB = writeClient.db('tst_gui_event_db');
+
+    console.log('✅ Write DB connected');
+    return writeDB;
+  } catch (err) {
+    console.error('❌ Write DB connection failed:', err.message);
+    process.exit(1);
+  }
+};
+
 
 // ================= FILTERS =================
 const timeIntervalFilter = (start, end) => {

@@ -14,7 +14,7 @@ vi.mock("fs/promises", () => ({
 }));
 
 
-vi.mock("../database/db.js", () => ({
+vi.mock("../../database/db.js", () => ({
   connectDB: vi.fn(async () => ({
     collection: vi.fn(() => ({
       distinct: vi.fn(async () => [
@@ -34,7 +34,7 @@ vi.mock("../database/db.js", () => ({
 }));
 
 
-import { getEventType } from "../database/eventTypes.js";
+import { getEventType } from "../../database/eventTypes.js";
 
 
 // Tests

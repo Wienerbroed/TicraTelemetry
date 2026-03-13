@@ -1,7 +1,7 @@
 import { vi, describe, it, expect } from 'vitest';
 
 // Mock data and calls
-vi.mock('../database/db.js', () => ({
+vi.mock('../../database/db.js', () => ({
   connectDB: async () => ({
     collection: () => ({
       // Mock distinct for getUsers()
@@ -40,7 +40,7 @@ vi.mock('../database/db.js', () => ({
 }));
 
 
-import { getUsers, } from '../database/user.js';
+import { getUsers, } from '../../database/user.js';
 
 
 //tests
