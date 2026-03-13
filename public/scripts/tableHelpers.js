@@ -50,13 +50,16 @@ export function applyStickyColumns(table, numColumns = 0) {
     const headers = [];
     const cellsPerColumn = [];
 
+    // Collect sticky columns and cells
     for (let col = 0; col < numColumns; col++) {
-        const header = thead.querySelector(`th:nth-child(${col+1})`);
-        const cells = [...tbody.querySelectorAll(`td:nth-child(${col+1})`)];
+        const header = thead.querySelector(`th:nth-child(${col + 1})`);
+        const cells = [...tbody.querySelectorAll(`td:nth-child(${col + 1})`)];
         headers.push(header);
         cellsPerColumn.push(cells);
-        header.style.backgroundColor = 'white';
-        cells.forEach(td => td.style.backgroundColor = 'white');
+
+        // Ensure background is applied
+        header.style.backgroundColor = '#fff';
+        cells.forEach(td => td.style.backgroundColor = '#fff');
     }
 
     function updateSticky() {
@@ -64,20 +67,30 @@ export function applyStickyColumns(table, numColumns = 0) {
         for (let col = 0; col < numColumns; col++) {
             const header = headers[col];
             const cells = cellsPerColumn[col];
+
+            // Sticky header
             header.style.position = 'sticky';
             header.style.left = `${leftOffset}px`;
             header.style.zIndex = 500;
+            header.style.backgroundColor = '#fff';
+
+            // Sticky cells
             cells.forEach(td => {
                 td.style.position = 'sticky';
                 td.style.left = `${leftOffset}px`;
                 td.style.zIndex = 400;
+                td.style.backgroundColor = '#fff';
             });
+
             leftOffset += header.getBoundingClientRect().width;
         }
     }
 
+    // Update on scroll and resize
     wrapper.addEventListener('scroll', updateSticky);
     window.addEventListener('resize', updateSticky);
+
+    // Initial update
     updateSticky();
 }
 

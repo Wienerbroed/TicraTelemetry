@@ -186,11 +186,11 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
             resizer.style.position = 'absolute';
             resizer.style.top = 0;
             resizer.style.right = 0;
-            resizer.style.width = '6px';       // easy to grab
+            resizer.style.width = '6px';       
             resizer.style.height = '100%';
             resizer.style.cursor = 'col-resize';
 
-            cell.style.position = 'relative';   // ensure parent is positioned
+            cell.style.position = 'relative';  
             cell.appendChild(resizer);
 
             let startX, startWidth;
