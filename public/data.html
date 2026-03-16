@@ -6,7 +6,6 @@
 <link rel="stylesheet" href="styles/styles.css">
 <link rel="stylesheet" href="styles/data.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 </head>
 <body>
 
@@ -77,12 +76,13 @@ setDefaultDateRange('startDate','endDate',10);
 
 const tooltip = document.getElementById('tooltip'); 
 
+// ================= LOAD EVENT TYPES =================
 async function loadEventTypes() {
   const data = await fetchJson('/eventQueries');
   const container = document.getElementById('eventTypeGroup');
   container.innerHTML = '';
 
-  data.forEach(async (ev) => {
+  for (const ev of data) {
     const wrapper = document.createElement('div');
     wrapper.classList.add('checkbox-container');
 
@@ -101,7 +101,7 @@ async function loadEventTypes() {
 
     function showTooltip() {
       tooltip.innerHTML = '';
-      if(ev) {
+      if(ev){
         const p = document.createElement('p'); 
         p.textContent = ev; 
         p.classList.add('title'); 
@@ -118,7 +118,7 @@ async function loadEventTypes() {
         img.src=imgSrc; 
         tooltip.appendChild(img);
       }
-      const rect = label.getBoundingClientRect(); // position relative to label
+      const rect = label.getBoundingClientRect();
       tooltip.style.top = `${rect.bottom + 10 + window.scrollY}px`;
       tooltip.style.left = `${rect.left + window.scrollX}px`;
       tooltip.style.display = 'block';
@@ -133,9 +133,10 @@ async function loadEventTypes() {
 
     wrapper.appendChild(label);
     container.appendChild(wrapper);
-  });
+  }
 }
 
+// ================= LOAD EMPLOYEE TYPES =================
 async function loadEmployeeTypes() {
   const data = await fetchJson('/employeeTypes');
   STATE.allEmployeeTypes = data.sort();
@@ -153,6 +154,7 @@ async function loadEmployeeTypes() {
   });
 }
 
+// ================= HELPER FUNCTIONS =================
 function getCheckedEmployeeTypes(){
   const checkboxes = Array.from(document.querySelectorAll('#employeeTypeGroup input.employee-checkbox'));
   const checked = checkboxes.filter(b=>b.checked).map(b=>b.value);
@@ -169,9 +171,17 @@ function setPresetRange(range) {
   const startInput = document.getElementById('startDate');
   const endInput = document.getElementById('endDate');
   const today = new Date();
-  if (range === 'all') { const fixedStart = new Date('2026-01-01'); startInput.value=formatDate(fixedStart); endInput.value=formatDate(today); return; }
-  const past = new Date(); if(range===30) past.setMonth(today.getMonth()-1); else past.setDate(today.getDate()-range);
-  startInput.value=formatDate(past); endInput.value=formatDate(today);
+  if (range === 'all') { 
+    const fixedStart = new Date('2026-01-01'); 
+    startInput.value=formatDate(fixedStart); 
+    endInput.value=formatDate(today); 
+    return; 
+  }
+  const past = new Date(); 
+  if(range===30) past.setMonth(today.getMonth()-1); 
+  else past.setDate(today.getDate()-range);
+  startInput.value=formatDate(past); 
+  endInput.value=formatDate(today);
 }
 
 document.querySelectorAll('.preset-btn').forEach(btn=>{
@@ -181,6 +191,52 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
   });
 });
 
+// ================= URL STATE MANAGEMENT =================
+function updateURLWithFilters() {
+  const startDate = document.getElementById('startDate').value;
+  const endDate = document.getElementById('endDate').value;
+  const events = getCheckedValues('eventTypeGroup');
+  const employees = getCheckedEmployeeTypes() ?? [];
+
+  const params = new URLSearchParams();
+  if (startDate) params.set('startDate', startDate);
+  if (endDate) params.set('endDate', endDate);
+  if (events.length) params.set('events', events.join(','));
+  if (employees.length) params.set('employees', employees.join(','));
+
+  const newUrl = `${window.location.pathname}?${params.toString()}`;
+  window.history.replaceState({}, '', newUrl);
+}
+
+function applyFiltersFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const startDate = params.get('startDate');
+  const endDate = params.get('endDate');
+  const events = params.get('events')?.split(',') ?? [];
+  const employees = params.get('employees')?.split(',') ?? [];
+
+  if (startDate) document.getElementById('startDate').value = startDate;
+  if (endDate) document.getElementById('endDate').value = endDate;
+
+  // Wait for event and employee types to load
+  const interval = setInterval(() => {
+    const eventInputs = document.querySelectorAll('#eventTypeGroup input');
+    const empInputs = document.querySelectorAll('#employeeTypeGroup input');
+
+    if(eventInputs.length && empInputs.length){
+      eventInputs.forEach(input => {
+        if(events.includes(input.value)) input.checked = true;
+      });
+      empInputs.forEach(input => {
+        if(employees.includes(input.value)) input.checked = true;
+      });
+      if(events.length) document.getElementById('applyButton').click();
+      clearInterval(interval);
+    }
+  }, 100);
+}
+
+// ================= APPLY BUTTON =================
 document.getElementById('applyButton').addEventListener('click', async ()=>{
   const selectedEventTypes = getCheckedValues('eventTypeGroup');
   if(!selectedEventTypes.length) return;
@@ -213,8 +269,10 @@ document.getElementById('applyButton').addEventListener('click', async ()=>{
 
   STATE.eventTypeOrder = [...new Set(STATE.eventTypeOrder)];
   renderTableAndCharts();
+  updateURLWithFilters();
 });
 
+// ================= BUILD PER USER =================
 function buildPerUser(events){
   const perUser={}, totals={};
   events.forEach(e=>totals[e.user]=(totals[e.user]??0)+e.count);
@@ -227,9 +285,11 @@ function buildPerUser(events){
   return perUser;
 }
 
+// ================= DOWNLOAD BUTTON =================
 const downloadBtn = document.getElementById('downloadBtn');
 downloadBtn.addEventListener('click',()=>downloadTableCSV());
 
+// ================= RENDER TABLE & CHARTS =================
 function renderTableAndCharts(){
   const perUser=buildPerUser(STATE.fullEvents);
   drawTable(perUser, STATE);
@@ -240,8 +300,11 @@ function renderTableAndCharts(){
   renderMultipleBarCharts(chartContainer,perUser,STATE.eventTypeOrder,COLORS,false);
 }
 
-loadEventTypes();
-loadEmployeeTypes();
+// ================= INITIAL LOAD =================
+loadEventTypes().then(loadEmployeeTypes).then(() => {
+  applyFiltersFromURL(); // auto-load filters from URL
+});
+
 </script>
 
 <footer>© TICRA foundation</footer>

@@ -1,4 +1,4 @@
-// ---------------------------- UPDATED TIMELINE FUNCTION ----------------------------
+// ---------------------------- FULL TIMELINE WITH FOCUS SEGMENTS & LINES ----------------------------
 export async function loadTimeline(sessionId) {
     const timelineContainer = document.getElementById('timelineContainer');
     const timelineDiv = document.getElementById('timeline');
@@ -11,12 +11,17 @@ export async function loadTimeline(sessionId) {
     timelineDiv.style.position = 'relative';
     timelineDiv.style.display = 'flex';
     timelineDiv.style.alignItems = 'flex-start';
+    timelineDiv.style.flexWrap = 'nowrap';
 
     const colorMap = {};
     let zoomFactor = 1;
     const ZOOM_STEP = 0.2;
     const MIN_ZOOM = 0.5;
     const MAX_ZOOM = 10;
+    let showFocus = true;
+
+    let eventLines = [];
+    let focusLines = [];
 
     try {
         const response = await fetch(`/sessionTimeline?sessionId=${sessionId}`);
@@ -47,139 +52,288 @@ export async function loadTimeline(sessionId) {
             </div>
         `;
 
-        const totalDuration = data.totalDurationSeconds || 1;
         const MIN_TOTAL_WIDTH = 1200;
         const timelineTotalWidth = Math.max(data.timeline.length * 50, MIN_TOTAL_WIDTH);
-
         const tabEventMap = {};
 
-        // Create Tabpage boxes
+        // ------------------- EXTRACT FOCUS PERIODS -------------------
+        const focusIntervals = [];
+        let lostFocusEvent = null;
+
         data.timeline.forEach(ev => {
-            if (ev.event_type === 'Tabpage') {
-                const box = document.createElement('div');
-                box.className = 'event-box';
-                box.dataset.eventNumber = ev.event_number;
-                box.dataset.startTime = new Date(ev.time_stamp).getTime();
-                box.dataset.durationSeconds = ev.durationSeconds;
-
-                const width = Math.max((ev.durationSeconds / totalDuration) * timelineTotalWidth, 20);
-                box.style.width = width + 'px';
-                box.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#666';
-                box.style.position = 'relative';
-                box.style.marginRight = '2px';
-                box.style.flexShrink = 0;
-
-                const text = document.createElement('div');
-                text.className = 'tabpage-text';
-                text.innerText = ev.payload ?? '';
-                box.appendChild(text);
-
-                box.addEventListener('mouseenter', e => {
-                    tooltip.style.display = 'block';
-                    const startTimeStr = new Date(ev.time_stamp).toLocaleTimeString();
-                    tooltip.innerText = `Tab: ${ev.payload ?? 'N/A'}\nStart Time: ${startTimeStr}\nTotal time spent: ${formatDuration(ev.durationSeconds)}`;
-                });
-                box.addEventListener('mousemove', e => {
-                    tooltip.style.left = e.pageX + 10 + 'px';
-                    tooltip.style.top = e.pageY + 10 + 'px';
-                });
-                box.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-
-                timelineDiv.appendChild(box);
-                tabEventMap[ev.event_number] = box;
+            if (ev.event_type === 'Focus') {
+                if (ev.payload === 'Lost Focus') lostFocusEvent = ev;
+                else if (ev.payload === 'Got Focus' && lostFocusEvent) {
+                    focusIntervals.push({
+                        startTime: new Date(lostFocusEvent.time_stamp),
+                        endTime: new Date(ev.time_stamp)
+                    });
+                    lostFocusEvent = null;
+                }
             }
         });
 
-        // Create lines for other events
+        // ------------------- CREATE TABPAGE BOXES WITH INTERNAL SEGMENTS -------------------
         data.timeline.forEach(ev => {
-            if (ev.event_type !== 'Tabpage') {
-                const tabEvent = data.timeline.slice(0, data.timeline.indexOf(ev)).reverse().find(e => e.event_type === 'Tabpage');
+            if (ev.event_type !== 'Tabpage') return;
+
+            const box = document.createElement('div');
+            box.className = 'event-box';
+            box.dataset.startTime = new Date(ev.time_stamp).getTime();
+            box.dataset.durationSeconds = ev.durationSeconds;
+            box.style.position = 'relative';
+            box.style.display = 'flex';
+            box.style.flexDirection = 'row';
+            box.style.marginRight = '0px';
+            box.style.flexShrink = 0;
+
+            const tabStart = new Date(ev.time_stamp);
+            const tabEnd = new Date(tabStart.getTime() + ev.durationSeconds * 1000);
+
+            const segments = [];
+            let lastTime = tabStart;
+
+            focusIntervals.forEach(focus => {
+                const focusStart = focus.startTime < tabStart ? tabStart : focus.startTime;
+                const focusEnd = focus.endTime > tabEnd ? tabEnd : focus.endTime;
+                if (focusEnd <= focusStart) return;
+
+                if (focusStart > lastTime) {
+                    segments.push({ start: lastTime, end: focusStart, payload: ev.payload, isFocus: false });
+                }
+
+                segments.push({ start: focusStart, end: focusEnd, payload: 'Lost Focus', isFocus: true });
+                lastTime = focusEnd;
+            });
+
+            if (lastTime < tabEnd) {
+                segments.push({ start: lastTime, end: tabEnd, payload: ev.payload, isFocus: false });
+            }
+
+            let totalSegmentWidth = 0;
+
+            segments.forEach(seg => {
+                const segDuration = (seg.end - seg.start) / 1000;
+                const segWidth = Math.max((segDuration / data.totalDurationSeconds) * timelineTotalWidth, 2);
+                seg.domWidth = segWidth;
+                totalSegmentWidth += segWidth;
+            });
+
+            box.style.width = totalSegmentWidth + 'px';
+            box.originalWidth = totalSegmentWidth;
+            box.segments = [];
+
+            segments.forEach(seg => {
+                const segDiv = document.createElement('div');
+                segDiv.style.width = seg.domWidth + 'px';
+                segDiv.dataset.originalWidth = seg.domWidth;
+                segDiv.style.height = '100%';
+                segDiv.style.display = 'flex';
+                segDiv.style.justifyContent = 'center';
+                segDiv.style.alignItems = 'center';
+                segDiv.style.fontSize = '12px';
+                segDiv.style.color = '#fff';
+                segDiv.style.borderRadius = '4px';
+                segDiv.style.overflow = 'hidden';
+                segDiv.style.whiteSpace = 'nowrap';
+                segDiv.style.textOverflow = 'ellipsis';
+                segDiv.innerText = seg.payload;
+
+                if (seg.isFocus) {
+                    segDiv.style.backgroundColor = '#888';
+                    segDiv.classList.add('focus-segment');
+                    segDiv.innerText = 'Lost';
+                } else {
+                    segDiv.style.backgroundColor = getColor(ev.event_type, seg.payload);
+                }
+
+                segDiv.addEventListener('mouseenter', e => {
+                    tooltip.style.display = 'block';
+                    tooltip.innerText = `${seg.payload}\nStart: ${seg.start.toLocaleTimeString()}\nEnd: ${seg.end.toLocaleTimeString()}\nDuration: ${formatDuration((seg.end-seg.start)/1000)}`;
+                });
+
+                segDiv.addEventListener('mousemove', e => {
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                });
+
+                segDiv.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
+
+                box.appendChild(segDiv);
+
+                box.segments.push({
+                    start: seg.start.getTime(),
+                    end: seg.end.getTime(),
+                    domElement: segDiv
+                });
+            });
+
+            timelineDiv.appendChild(box);
+            tabEventMap[ev.event_number] = box;
+        });
+
+        // ------------------- OTHER EVENT LINES -------------------
+        eventLines = [];
+
+        data.timeline.forEach(ev => {
+            if (ev.event_type !== 'Tabpage' && ev.event_type !== 'Focus') {
+
+                const tabEvent = data.timeline
+                    .slice(0, data.timeline.indexOf(ev))
+                    .reverse()
+                    .find(e => e.event_type === 'Tabpage');
+
                 if (!tabEvent) return;
+
                 const parentBox = tabEventMap[tabEvent.event_number];
                 if (!parentBox) return;
 
                 const line = document.createElement('div');
                 line.className = 'event-line';
-                line.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#333';
                 line.style.position = 'absolute';
-                line.style.width = '2px'; // fixed width
-                line.style.height = `${parentBox.offsetHeight + 50}px`;
-                line.parentBoxRef = parentBox; // store reference
+                line.style.width = '2px';
+                line.style.backgroundColor = getColor(ev.event_type, ev.payload) || '#333';
+                line.parentBoxRef = parentBox;
                 line.dataset.eventTime = new Date(ev.time_stamp).getTime();
-
-                line.style.top = `-50px`;
-
-                const updateLinePosition = () => {
-                    const boxWidth = parentBox.offsetWidth * zoomFactor;
-                    const boxStartTime = parseInt(parentBox.dataset.startTime, 10);
-                    const boxEndTime = boxStartTime + parseInt(parentBox.dataset.durationSeconds, 10) * 1000;
-                    const percent = Math.min(Math.max((line.dataset.eventTime - boxStartTime) / (boxEndTime - boxStartTime), 0), 1);
-                    line.style.left = `${parentBox.offsetLeft * zoomFactor + percent * boxWidth}px`;
-                };
-
-                updateLinePosition(); // initial position
+                line.style.top = '-50px';
 
                 line.addEventListener('mouseenter', e => {
                     tooltip.style.display = 'block';
-                    tooltip.innerText = `${ev.event_type}\nPayload: ${ev.payload ?? 'None'}\nTime: ${new Date(ev.time_stamp).toLocaleTimeString()}`;
+                    tooltip.innerText = `${ev.event_type}\nPayload: ${ev.payload ?? 'No payload'}\nTime: ${new Date(ev.time_stamp).toLocaleTimeString()}`;
                 });
+
                 line.addEventListener('mousemove', e => {
                     tooltip.style.left = e.pageX + 10 + 'px';
                     tooltip.style.top = e.pageY + 10 + 'px';
                 });
-                line.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+                line.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
 
                 timelineDiv.appendChild(line);
+                eventLines.push(line);
             }
         });
 
-        // Create legend
-        const grouped = {};
-        Object.keys(colorMap).forEach(key => {
-            const [type, payloadStr] = key.split(/-(.+)/);
-            if (!grouped[type]) grouped[type] = [];
-            grouped[type].push({ key, payloadStr, color: colorMap[key] });
+        // ------------------- FOCUS LINES -------------------
+        focusLines = [];
+
+        focusIntervals.forEach(focus => {
+
+            const tabEvent = data.timeline
+                .filter(e => e.event_type === 'Tabpage')
+                .find(tab => {
+                    const tabStart = new Date(tab.time_stamp);
+                    const tabEnd = new Date(tabStart.getTime() + tab.durationSeconds * 1000);
+                    return focus.startTime < tabEnd && focus.endTime > tabStart;
+                });
+
+            if (!tabEvent) return;
+
+            const parentBox = tabEventMap[tabEvent.event_number];
+            if (!parentBox) return;
+
+            const createFocusLine = timestamp => {
+
+                const line = document.createElement('div');
+                line.className = 'event-line focus-line';
+                line.style.position = 'absolute';
+                line.style.width = '2px';
+                line.style.backgroundColor = '#000';
+                line.style.top = '-70px';
+                line.parentBoxRef = parentBox;
+                line.dataset.eventTime = timestamp;
+
+                line.addEventListener('mouseenter', e => {
+                    tooltip.style.display = 'block';
+                    tooltip.innerText = `Focus Line\nTime: ${new Date(timestamp).toLocaleTimeString()}`;
+                });
+
+                line.addEventListener('mousemove', e => {
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                });
+
+                line.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
+
+                timelineDiv.appendChild(line);
+                focusLines.push(line);
+            };
+
+            createFocusLine(focus.startTime.getTime());
+            createFocusLine(focus.endTime.getTime());
         });
-        Object.keys(grouped).forEach(type => {
-            const column = document.createElement('div');
-            column.className = 'legend-column';
-            const title = document.createElement('div');
-            title.className = 'legend-title';
-            title.innerText = type;
-            column.appendChild(title);
 
-            grouped[type].forEach(item => {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'legend-item';
-                const colorBox = document.createElement('div');
-                colorBox.className = 'legend-color';
-                colorBox.style.backgroundColor = item.color;
-                const label = document.createElement('span');
-                label.innerText = item.payloadStr === 'null' ? 'No payload' : item.payloadStr;
-                itemDiv.appendChild(colorBox);
-                itemDiv.appendChild(label);
-                column.appendChild(itemDiv);
-            });
+        // ------------------- UPDATE EVENT LINES (ALIGNMENT FIX) -------------------
+        function updateEventLines() {
 
-            timelineLegend.appendChild(column);
-        });
+            const timelineRect = timelineDiv.getBoundingClientRect();
 
-        timelineContainer.scrollIntoView({ behavior: 'smooth' });
+            [...eventLines, ...focusLines].forEach(line => {
 
-        // Zoom functions
-        const applyZoom = () => {
-            timelineDiv.style.transform = `scaleX(${zoomFactor})`;
-            timelineDiv.style.transformOrigin = 'left center';
-
-            // reposition lines
-            document.querySelectorAll('.event-line').forEach(line => {
                 const parentBox = line.parentBoxRef;
-                const boxWidth = parentBox.offsetWidth * zoomFactor;
-                const boxStartTime = parseInt(parentBox.dataset.startTime, 10);
-                const boxEndTime = boxStartTime + parseInt(parentBox.dataset.durationSeconds, 10) * 1000;
-                const percent = Math.min(Math.max((line.dataset.eventTime - boxStartTime) / (boxEndTime - boxStartTime), 0), 1);
-                line.style.left = `${parentBox.offsetLeft * zoomFactor + percent * boxWidth}px`;
+                if (!parentBox) return;
+
+                const boxRect = parentBox.getBoundingClientRect();
+                const eventTime = parseInt(line.dataset.eventTime, 10);
+
+                let leftWithinBox = 0;
+                let foundSegment = null;
+
+                for (const seg of parentBox.segments) {
+
+                    if (eventTime >= seg.start && eventTime <= seg.end) {
+                        foundSegment = seg;
+                        break;
+                    }
+
+                    leftWithinBox += seg.domElement.offsetWidth;
+                }
+
+                if (foundSegment) {
+                    const segDuration = foundSegment.end - foundSegment.start;
+                    const timeIntoSeg = eventTime - foundSegment.start;
+                    const relativePos = segDuration > 0 ? (timeIntoSeg / segDuration) : 0;
+                    leftWithinBox += relativePos * foundSegment.domElement.offsetWidth;
+                }
+
+                const leftPos = (boxRect.left - timelineRect.left) + leftWithinBox;
+
+                line.style.left = `${leftPos}px`;
+
+                line.style.height = line.classList.contains('focus-line')
+                    ? `${parentBox.offsetHeight + 70}px`
+                    : `${parentBox.offsetHeight + 50}px`;
             });
+        }
+
+        // ------------------- ZOOM -------------------
+        const applyZoom = () => {
+
+            Object.values(tabEventMap).forEach(box => {
+
+                let totalWidth = 0;
+
+                box.segments.forEach(seg => {
+
+                    if (seg.domElement.classList.contains('focus-segment') && !showFocus) {
+                        seg.domElement.style.width = '10px';
+                    } else {
+                        seg.domElement.style.width = seg.domElement.dataset.originalWidth * zoomFactor + 'px';
+                    }
+
+                    totalWidth += parseFloat(seg.domElement.style.width);
+                });
+
+                box.style.width = totalWidth + 'px';
+            });
+
+            updateEventLines();
         };
 
         document.getElementById('zoomInBtn').addEventListener('click', () => {
@@ -197,17 +351,58 @@ export async function loadTimeline(sessionId) {
             applyZoom();
         });
 
+        // ------------------- FOCUS TOGGLE -------------------
+        document.getElementById('toggleFocusBtn').addEventListener('click', () => {
+
+            showFocus = !showFocus;
+
+            Object.values(tabEventMap).forEach(box => {
+
+                let totalWidth = 0;
+
+                box.segments.forEach(seg => {
+
+                    if (seg.domElement.classList.contains('focus-segment') && !showFocus) {
+                        seg.domElement.style.width = '10px';
+                        seg.domElement.innerText = '';
+                    } else {
+                        seg.domElement.style.width = seg.domElement.dataset.originalWidth * zoomFactor + 'px';
+
+                        if (seg.domElement.classList.contains('focus-segment')) {
+                            seg.domElement.innerText = 'Lost';
+                        }
+                    }
+
+                    totalWidth += parseFloat(seg.domElement.style.width);
+                });
+
+                box.style.width = totalWidth + 'px';
+            });
+
+            updateEventLines();
+        });
+
+        updateEventLines();
+
     } catch (err) {
         console.error("Failed to load timeline:", err);
         timelineSummary.innerHTML = '<p>Unable to load timeline.</p>';
     }
 
     function getColor(eventType, payload){
-        const key = payload ? `${eventType}-${JSON.stringify(payload)}` : `${eventType}-null`;
+        if(payload === 'Lost Focus') return '#888';
+
+        const key = payload
+            ? `${eventType}-${JSON.stringify(payload)}`
+            : `${eventType}-null`;
+
         if(!colorMap[key]){
             const hue = (Object.keys(colorMap).length * 100) % 360;
-            colorMap[key] = payload ? `hsl(${hue},50%,40%)` : "#888";
+            colorMap[key] = payload
+                ? `hsl(${hue},50%,40%)`
+                : "#666";
         }
+
         return colorMap[key];
     }
 }
