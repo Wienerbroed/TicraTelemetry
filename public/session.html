@@ -63,14 +63,10 @@
     </table>
   </div>
 
-  <!-- Download button -->
-
-</div>
   <div>
-    <button id="downloadBtn" type="button" title="Download CSV">
-      Download Excel
-    </button>
+    <button id="downloadBtn" type="button" title="Download CSV">Download Excel</button>
   </div>
+</div>
 
 <div id="timelineContainer" style="display:none; margin:20px 0;">
   <h3>Session Timeline</h3>
@@ -78,11 +74,12 @@
   <div class="timeline-wrapper">
     <div id="timeline" class="timeline"></div>
   </div>
-    <div style="margin-bottom:10px;">
-        <button id="zoomOutBtn">- Zoom Out</button>
-        <button id="zoomInBtn">+ Zoom In</button>
-        <button id="zoomResetBtn">Reset Zoom</button>
-    </div>
+  <div style="margin-bottom:10px;">
+    <button id="zoomOutBtn">- Zoom Out</button>
+    <button id="zoomInBtn">+ Zoom In</button>
+    <button id="zoomResetBtn">Reset Zoom</button>
+    <button id="toggleFocusBtn" type="button">Toggle Focus Periods</button>
+  </div>
   <div id="timelineLegend" class="legend"></div>
 </div>
 
@@ -113,8 +110,6 @@ window.loadTimeline = loadTimeline;
 // Download button
 const downloadBtn = document.getElementById('downloadBtn');
 downloadBtn.addEventListener('click', () => downloadTableCSV());
-
-// Function to toggle download button visibility
 function toggleDownloadButton(show) { 
     downloadBtn.style.display = show ? 'inline-block' : 'none'; 
 }
@@ -122,7 +117,7 @@ function toggleDownloadButton(show) {
 // Set default date range
 setDefaultDateRange('startTime','endTime',10);
 
-// Initialize dropdowns
+// ================= INIT DROPDOWNS =================
 async function initDropdowns() {
     const eventTypes = await fetchJson('/sessionTypes');
     eventTypeSelect.innerHTML = '<option value="">Select Event Type</option>';
@@ -143,8 +138,9 @@ async function initDropdowns() {
         employeeSelect.appendChild(group);
     }
 }
-initDropdowns();
+await initDropdowns();
 
+// ================= HELPER FUNCTIONS =================
 function formatDateTimeLocal(date) {
     const pad = n => n.toString().padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -166,7 +162,47 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     });
 });
 
-// Tooltip loader
+// ================= URL STATE MANAGEMENT =================
+function updateURLWithFilters(sessionId = null) {
+    const params = new URLSearchParams();
+    if(startInput.value) params.set('startTime', startInput.value);
+    if(endInput.value) params.set('endTime', endInput.value);
+    if(eventTypeSelect.value) params.set('eventType', eventTypeSelect.value);
+    if(employeeSelect.value) params.set('employee', employeeSelect.value);
+
+    
+    if(sessionId) params.set('sessionId', sessionId);
+
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+}
+
+function applyFiltersFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const startTime = params.get('startTime');
+    const endTime = params.get('endTime');
+    const eventType = params.get('eventType');
+    const employee = params.get('employee');
+    const sessionId = params.get('sessionId');
+
+    if(startTime) startInput.value = startTime;
+    if(endTime) endInput.value = endTime;
+
+    if(eventType) eventTypeSelect.value = eventType;
+    if(employee) employeeSelect.value = employee;
+
+    // Apply filters first
+    if(eventType || employee) applyButton.click();
+
+    // Then auto-load timeline if sessionId exists
+    if(sessionId){
+        setTimeout(() => {
+            loadTimeline(sessionId);
+            updateURLWithFilters(sessionId);
+        }, 200);
+    }
+}
+
+// ================= TOOLTIP LOADER =================
 window.loadDescriptionTooltip = async function(configTitle){
     if (!configTitle) return;
     try {
@@ -185,7 +221,7 @@ window.loadDescriptionTooltip = async function(configTitle){
     }
 };
 
-// Apply button fetch
+// ================= APPLY BUTTON =================
 applyButton.addEventListener('click', async e=>{
     e.preventDefault();
     const selectedConfig = eventTypeSelect.value;
@@ -195,8 +231,8 @@ applyButton.addEventListener('click', async e=>{
     const selectedOption = employeeSelect.querySelector(`option[value="${selectedEmployee}"]`);
     const isType = selectedOption?.dataset.type==='employeeType';
 
-    const startTime = startInput.value || new Date(Date.now()-30*24*60*60*1000).toISOString();
-    const endTime = endInput.value || new Date().toISOString();
+    const startTime = startInput.value;
+    const endTime = endInput.value;
     const params = new URLSearchParams();
     params.append('configTitle', selectedConfig);
     params.append('startTime', startTime);
@@ -208,13 +244,17 @@ applyButton.addEventListener('click', async e=>{
         const data = await fetchJson(`/session?${params.toString()}`);
         STATE.fullSessions = data.sessions || [];
         renderTableAndCharts(selectedEmployee, isType);
+
+        // Remove sessionId when applying new filters
+        updateURLWithFilters();
     }catch(err){
         console.error(err); alert("Failed to load sessions.");
         STATE.fullSessions=[]; renderTableAndCharts();
+        updateURLWithFilters();
     }
 });
 
-// Render table and charts
+// ================= RENDER TABLE & CHARTS =================
 function renderTableAndCharts(selectedEmployee=null,isType=false){
     const sessions = STATE.fullSessions;
     const table=document.getElementById('bigTable');
@@ -222,7 +262,6 @@ function renderTableAndCharts(selectedEmployee=null,isType=false){
         table.querySelector('thead').innerHTML='';
         table.querySelector('tbody').innerHTML='';
         document.getElementById('multiChartContainer').innerHTML='';
-        toggleDownloadButton(false);
         return;
     }
 
@@ -245,6 +284,10 @@ function renderTableAndCharts(selectedEmployee=null,isType=false){
     renderSessionCharts(STATE, perUser, tabs, columns, selectedEmployee, isType);
     toggleDownloadButton(document.querySelector('#bigTable tbody').children.length > 0);
 }
+
+// ================= INITIAL LOAD =================
+applyFiltersFromURL();
+
 </script>
 </body>
 </html>

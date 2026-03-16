@@ -38,7 +38,15 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
         if (selectedEmployee && !isType && idx >= 3) {
             div.style.cursor = "pointer";
             div.style.textDecoration = "underline";
-            div.addEventListener('click', () => window.loadTimeline(sessionIdForClick));
+            div.addEventListener('click', () => {
+                // Original timeline loader
+                window.loadTimeline(sessionIdForClick);
+
+                // Add sessionId to URL while preserving other filters
+                const params = new URLSearchParams(window.location.search);
+                params.set('sessionId', sessionIdForClick);
+                window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+            });
         }
 
         th.appendChild(div);
@@ -125,11 +133,11 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
 
         // Row hover highlight for operation cell only (solid color)
         tr.addEventListener('mouseenter', () => { 
-            opCell.style.backgroundColor = '#fcc85d'; // solid highlight
+            opCell.style.backgroundColor = '#fcc85d';
             opCell.style.fontWeight = 'bold'; 
         });
         tr.addEventListener('mouseleave', () => { 
-            opCell.style.backgroundColor = ''; // revert to original
+            opCell.style.backgroundColor = '';
             opCell.style.fontWeight = ''; 
         });
 
@@ -182,7 +190,6 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
 
-            // Position resizer along the right edge of the cell
             resizer.style.position = 'absolute';
             resizer.style.top = 0;
             resizer.style.right = 0;
@@ -202,8 +209,6 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
 
                 function onMouseMove(e) {
                     const newWidth = Math.max(80, startWidth + (e.pageX - startX));
-
-                    // Apply new width to all first-column cells
                     table.querySelectorAll("thead th:first-child, tbody td:first-child")
                         .forEach(td => td.style.width = newWidth + 'px');
                 }
