@@ -143,7 +143,7 @@ async function showConfigInfo(title) {
     return;
   }
   try {
-    const res = await fetch(`/api/configs/${title}`);
+    const res = await fetch(`/api/configs/${encodeURIComponent(title)}`);
     if(!res.ok) throw new Error("Config not found");
     const config = await res.json();
     selectedConfig = config;
@@ -203,7 +203,7 @@ async function createNewConfig(){
 async function deleteConfig(){
   if(!selectedConfig) return;
   if(!confirm(`Delete "${selectedConfig.title}"?`)) return;
-  await fetch(`/api/configs/${selectedConfig.title}`, {method:"DELETE"});
+  await fetch(`/api/configs/${encodeURIComponent(selectedConfig.title)}`, {method:"DELETE"});
   selectedConfig=null; originalTitle=null;
   document.getElementById("configInfoContainer").innerHTML="";
   await loadDropdowns();
@@ -271,7 +271,7 @@ async function submitUpdate() {
   formData.append("description", description);
   if (imageInput.files[0]) formData.append("image", imageInput.files[0]);
 
-  const res = await fetch(`/api/configs/${originalTitle}`, { method: "PUT", body: formData });
+  const res = await fetch(`/api/configs/${encodeURIComponent(originalTitle)}`, { method: "PUT", body: formData });
   const result = await res.json();
   if (!res.ok) return alert(result.error);
 

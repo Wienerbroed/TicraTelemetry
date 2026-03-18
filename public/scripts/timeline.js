@@ -56,6 +56,15 @@ export async function loadTimeline(sessionId) {
         const timelineTotalWidth = Math.max(data.timeline.length * 50, MIN_TOTAL_WIDTH);
         const tabEventMap = {};
 
+        // ------------------- LEGEND DATA BUILD (ADDED) -------------------
+        const legendMap = {};
+        data.timeline.forEach(ev => {
+            if (!legendMap[ev.event_type]) {
+                legendMap[ev.event_type] = new Set();
+            }
+            legendMap[ev.event_type].add(ev.payload ?? 'No Payload');
+        });
+
         // ------------------- EXTRACT FOCUS PERIODS -------------------
         const focusIntervals = [];
         let lostFocusEvent = null;
@@ -174,6 +183,50 @@ export async function loadTimeline(sessionId) {
             tabEventMap[ev.event_number] = box;
         });
 
+        // ------------------- LEGEND RENDER (ADDED) -------------------
+        Object.entries(legendMap).forEach(([eventType, payloadSet]) => {
+
+            const section = document.createElement('div');
+            section.style.marginBottom = '10px';
+
+            const header = document.createElement('div');
+            header.innerText = eventType;
+            header.style.fontWeight = 'bold';
+            header.style.marginBottom = '4px';
+
+            section.appendChild(header);
+
+            payloadSet.forEach(payload => {
+
+                const item = document.createElement('div');
+                item.style.display = 'flex';
+                item.style.alignItems = 'center';
+                item.style.fontSize = '12px';
+                item.style.marginBottom = '2px';
+
+                const colorBox = document.createElement('span');
+                colorBox.style.width = '12px';
+                colorBox.style.height = '12px';
+                colorBox.style.display = 'inline-block';
+                colorBox.style.marginRight = '6px';
+                colorBox.style.borderRadius = '2px';
+
+                colorBox.style.backgroundColor =
+                    payload === 'Lost Focus'
+                        ? '#888'
+                        : getColor(eventType, payload);
+
+                const label = document.createElement('span');
+                label.innerText = payload;
+
+                item.appendChild(colorBox);
+                item.appendChild(label);
+                section.appendChild(item);
+            });
+
+            timelineLegend.appendChild(section);
+        });
+
         // ------------------- OTHER EVENT LINES -------------------
         eventLines = [];
 
@@ -269,7 +322,7 @@ export async function loadTimeline(sessionId) {
             createFocusLine(focus.endTime.getTime());
         });
 
-        // ------------------- UPDATE EVENT LINES (ALIGNMENT FIX) -------------------
+        
         function updateEventLines() {
 
             const timelineRect = timelineDiv.getBoundingClientRect();

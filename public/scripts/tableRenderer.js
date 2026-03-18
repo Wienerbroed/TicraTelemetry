@@ -72,34 +72,6 @@ export async function drawTable(perUser, STATE) {
     });
   }
 
-  function makeRowsResizable(table) {
-    const rows = table.querySelectorAll("tbody tr");
-    rows.forEach(row => {
-      const firstCell = row.querySelector("td");
-      if (!firstCell || firstCell.querySelector('.row-resizer')) return;
-      firstCell.style.position = "relative";
-      const resizer = document.createElement("div");
-      resizer.classList.add("row-resizer");
-      firstCell.appendChild(resizer);
-      let startY, startHeight;
-      resizer.addEventListener("mousedown", (e) => {
-        e.stopPropagation();
-        startY = e.pageY;
-        startHeight = row.offsetHeight;
-        function onMouseMove(e) {
-          const newHeight = Math.max(24, startHeight + (e.pageY - startY));
-          row.style.height = newHeight + "px";
-        }
-        function onMouseUp() {
-          document.removeEventListener("mousemove", onMouseMove);
-          document.removeEventListener("mouseup", onMouseUp);
-        }
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
-      });
-    });
-  }
-
   let rowColorToggle = false;
 
   for (const eventType of STATE.eventTypeOrder) {
@@ -165,5 +137,4 @@ export async function drawTable(perUser, STATE) {
   applyStickyColumns(table, 4);
   toggleDownloadButton(tbody.children.length > 0);
   makeColumnsResizable(table);
-  makeRowsResizable(table);
 }
