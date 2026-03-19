@@ -179,17 +179,17 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
     // Column & row resizing
     // -------------------------
     makeColumnsResizable(table);
-    makeRowsResizable(table);
+    
 
     function makeColumnsResizable(table) {
         const firstColCells = table.querySelectorAll("thead th:first-child, tbody td:first-child");
+        const summaryHeaders = table.querySelectorAll("thead th.summary-header"); // AVERAGE and TOTAL
 
         firstColCells.forEach(cell => {
             if (cell.querySelector('.col-resizer')) return;
 
             const resizer = document.createElement('div');
             resizer.className = 'col-resizer';
-
             resizer.style.position = 'absolute';
             resizer.style.top = 0;
             resizer.style.right = 0;
@@ -209,8 +209,14 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
 
                 function onMouseMove(e) {
                     const newWidth = Math.max(80, startWidth + (e.pageX - startX));
-                    table.querySelectorAll("thead th:first-child, tbody td:first-child")
-                        .forEach(td => td.style.width = newWidth + 'px');
+                    
+                    // Resize the first column
+                    firstColCells.forEach(td => td.style.width = newWidth + 'px');
+
+                    // Shift summary headers to follow
+                    summaryHeaders.forEach(th => {
+                        th.style.left = newWidth + 'px';
+                    });
                 }
 
                 function onMouseUp() {
@@ -224,34 +230,5 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
         });
     }
 
-    function makeRowsResizable(table) {
-        const rows = table.querySelectorAll("tbody tr");
-        rows.forEach(row => {
-            const firstCell = row.querySelector("td");
-            if (!firstCell || firstCell.querySelector('.row-resizer')) return;
-            firstCell.style.position = "relative";
-
-            const resizer = document.createElement('div');
-            resizer.className = 'row-resizer';
-            firstCell.appendChild(resizer);
-
-            let startY, startHeight;
-            resizer.addEventListener('mousedown', e => {
-                e.stopPropagation();
-                startY = e.pageY; startHeight = row.offsetHeight;
-
-                function onMouseMove(e) {
-                    row.style.height = Math.max(24, startHeight + (e.pageY - startY)) + 'px';
-                }
-
-                function onMouseUp() {
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                }
-
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
-        });
-    }
+    
 }
