@@ -32,6 +32,35 @@ const groupBy = (array, keyFn) =>
     return acc;
   }, {});
 
+/////////////////////// OVERLAP HELPERS ///////////////////////
+
+const buildFocusIntervals = (focusEvents) => {
+  const intervals = [];
+  let start = null;
+
+  for (const ev of focusEvents) {
+    const value = extractLastPayloadValue(ev.payload);
+    const time = new Date(ev.time_stamp);
+
+    if (value === "Lost Focus") {
+      start = time;
+    }
+
+    if (value === "Got Focus" && start) {
+      intervals.push({ start, end: time });
+      start = null;
+    }
+  }
+
+  return intervals;
+};
+
+const getOverlapSeconds = (startA, endA, startB, endB) => {
+  const start = new Date(Math.max(startA, startB));
+  const end = new Date(Math.min(endA, endB));
+  return Math.max((end - start) / 1000, 0);
+};
+
 /////////////////////// FETCH DATA POOL ///////////////////////
 
 const buildDataPoolPipeline = ({ inputEventType, startTime, endTime, employeeType }) => {
@@ -99,7 +128,8 @@ const fetchDataPoolByQueries = async ({ inputEventType, startTime, endTime, empl
   if (!startTime || !endTime) throw new Error("startTime and endTime are required");
 
   const pipeline = buildDataPoolPipeline({ inputEventType, startTime, endTime, employeeType });
-  const events = await dbCollection.aggregate(pipeline).toArray();
+
+  const events = await dbCollection.aggregate(pipeline, { allowDiskUse: true }).toArray();
 
   return { meta: { event_type: inputEventType, count: events.length }, events };
 };
@@ -110,6 +140,7 @@ const processSessionEventsForTable = (events, payloadField, rangeStart, rangeEnd
   const sessions = [];
   const employeeTabTotals = {};
   const employeeSessionCounts = {};
+  const employeeFocusTotals = {};
 
   const groupedSessions = groupBy(events, ev => ev.session_id);
 
@@ -121,15 +152,27 @@ const processSessionEventsForTable = (events, payloadField, rangeStart, rangeEnd
 
     employeeSessionCounts[user] = (employeeSessionCounts[user] || 0) + 1;
 
-    // sort ALL events (important)
     sessionEvents.sort((a, b) => a.event_number - b.event_number);
 
     const lastEventTime = new Date(
       sessionEvents[sessionEvents.length - 1].time_stamp
     );
 
-    // ONLY Tabpage drives rows (same as timeline)
     const tabEvents = sessionEvents.filter(ev => ev.event_type === "Tabpage");
+    const focusEvents = sessionEvents
+      .filter(ev => ev.event_type === "Focus")
+      .sort((a, b) => new Date(a.time_stamp) - new Date(b.time_stamp));
+
+    const focusIntervals = buildFocusIntervals(focusEvents);
+
+    let totalFocusTime = 0;
+
+    for (const interval of focusIntervals) {
+      totalFocusTime += (interval.end - interval.start) / 1000;
+    }
+
+    employeeFocusTotals[user] =
+      (employeeFocusTotals[user] || 0) + totalFocusTime;
 
     for (let i = 0; i < tabEvents.length; i++) {
       const current = tabEvents[i];
@@ -146,7 +189,6 @@ const processSessionEventsForTable = (events, payloadField, rangeStart, rangeEnd
       let startTime = new Date(current.time_stamp);
       let endTime;
 
-      // ✅ EXACT SAME RULES AS TIMELINE
       if (nextTab) {
         endTime = new Date(nextTab.time_stamp);
       } else if (sessionEvents.length > 1) {
@@ -157,7 +199,20 @@ const processSessionEventsForTable = (events, payloadField, rangeStart, rangeEnd
 
       [startTime, endTime] = clampToInterval(startTime, endTime, rangeStart, rangeEnd);
 
-      const durationSeconds = Math.max((endTime - startTime) / 1000, 0);
+      let durationSeconds = Math.max((endTime - startTime) / 1000, 0);
+
+      let focusOverlap = 0;
+
+      for (const interval of focusIntervals) {
+        focusOverlap += getOverlapSeconds(
+          startTime,
+          endTime,
+          interval.start,
+          interval.end
+        );
+      }
+
+      durationSeconds = Math.max(durationSeconds - focusOverlap, 0);
 
       sessions.push({
         user_name: user,
@@ -173,6 +228,16 @@ const processSessionEventsForTable = (events, payloadField, rangeStart, rangeEnd
       employeeTabTotals[user][tab] =
         (employeeTabTotals[user][tab] || 0) + durationSeconds;
     }
+
+    sessions.push({
+      user_name: user,
+      session_id: sessionId,
+      tab: "Lost Focus",
+      start_time: null,
+      end_time: null,
+      durationSeconds: totalFocusTime,
+      session_end: true
+    });
   }
 
   const totals = {};
@@ -188,10 +253,16 @@ const processSessionEventsForTable = (events, payloadField, rangeStart, rangeEnd
       totals[user][tab] = total;
       averages[user][tab] = total / sessionCount;
     }
+
+    const focusTotal = employeeFocusTotals[user] || 0;
+    totals[user]["Lost Focus"] = focusTotal;
+    averages[user]["Lost Focus"] = focusTotal / sessionCount;
   }
 
   return { sessions, totals, averages };
 };
+
+/////////////////////// FIXED FETCH (STREAMING) ///////////////////////
 
 const sessionFetchByQueries = async ({
   configTitle,
@@ -210,7 +281,6 @@ const sessionFetchByQueries = async ({
     ? config.payload_field[0]
     : config.payload_field;
 
-  // ✅ FIX: REMOVE event_type filter → get full session like timeline
   const matchFilter = {
     ...timeIntervalFilter(startTime, endTime)
   };
@@ -218,10 +288,29 @@ const sessionFetchByQueries = async ({
   if (user_name) matchFilter.user_name = user_name;
   if (employee_type) matchFilter.employee_type = employee_type;
 
-  const events = await dbCollection
-    .find(matchFilter)
-    .sort({ time_stamp: 1 })
-    .toArray();
+  // 🔥 REDUCE DATA FROM SOURCE
+  matchFilter.event_type = { $in: ["Tabpage", "Focus"] };
+
+  const projection = {
+    user_name: 1,
+    session_id: 1,
+    event_type: 1,
+    payload: 1,
+    time_stamp: 1,
+    event_number: 1
+  };
+
+  const cursor = dbCollection.aggregate([
+    { $match: matchFilter },
+    { $sort: { time_stamp: 1 } },
+    { $project: projection }
+  ], { allowDiskUse: true });
+
+  // 🔥 STREAM (avoid memory crash)
+  const events = [];
+  for await (const doc of cursor) {
+    events.push(doc);
+  }
 
   const rangeStart = new Date(startTime);
   const rangeEnd = new Date(endTime);
@@ -229,13 +318,23 @@ const sessionFetchByQueries = async ({
   return processSessionEventsForTable(events, payloadField, rangeStart, rangeEnd);
 };
 
-/////////////////////// SESSION TIMELINE ///////////////////////
+/////////////////////// SESSION TIMELINE (UNCHANGED) ///////////////////////
 
 const sessionTimeline = async ({ sessionId }) => {
   if (!sessionId) throw new Error("sessionId is required");
 
+  const projection = {
+    user_name: 1,
+    employee_type: 1,
+    event_number: 1,
+    event_type: 1,
+    payload: 1,
+    time_stamp: 1
+  };
+
   const events = await dbCollection
     .find({ session_id: sessionId })
+    .project(projection)
     .sort({ event_number: 1 })
     .toArray();
 
