@@ -288,7 +288,6 @@ const sessionFetchByQueries = async ({
   if (user_name) matchFilter.user_name = user_name;
   if (employee_type) matchFilter.employee_type = employee_type;
 
-  // 🔥 REDUCE DATA FROM SOURCE
   matchFilter.event_type = { $in: ["Tabpage", "Focus"] };
 
   const projection = {
@@ -306,7 +305,6 @@ const sessionFetchByQueries = async ({
     { $project: projection }
   ], { allowDiskUse: true });
 
-  // 🔥 STREAM (avoid memory crash)
   const events = [];
   for await (const doc of cursor) {
     events.push(doc);
