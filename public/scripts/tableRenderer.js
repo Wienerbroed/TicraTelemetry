@@ -8,7 +8,7 @@ export function toggleDownloadButton(show){
 
 export async function drawTable(perUser, STATE) {
   const selections = [...new Set(Object.keys(perUser).flatMap(u=>Object.keys(perUser[u])))].sort();
-  const table = document.getElementById('bigTable');
+  const table = STATE?.tableElement || document.getElementById('bigTable');
   const thead = table.querySelector('thead'); 
   const tbody = table.querySelector('tbody');
   

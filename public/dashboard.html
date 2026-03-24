@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Event Pool Widgets</title>
+
+<link rel="stylesheet" href="styles/styles.css">
+<link rel="stylesheet" href="styles/data.css">
+<link rel="stylesheet" href="styles/dashboard.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+
+</style>
+
+</head>
+
+<body>
+  <header>
+  <div class="navbar">
+    <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+    <a href="data.html"> Event DataPool </a>
+    <a href="session.html"> Sessions </a>
+    <a href="dashboard.html">Dashboard</a>
+  </div>
+</header>
+
+<h1 style="padding:16px;">Event Pool Viewer</h1>
+
+<div style="padding: 16px;">
+  <button id="addTableWidgetBtn">+ Add Table Widget</button>
+  <button id="addChartWidgetBtn">+ Add Chart Widget</button>
+</div>
+
+<div id="widgetGrid"></div>
+
+<script type="module">
+
+import { TableWidget } from './scripts/dashboardTable.js';
+import { ChartWidget } from './scripts/dashboardChart.js';
+
+/* =========================
+   DROPDOWN (UNCHANGED)
+========================= */
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.dropdown')) return;
+
+  document.querySelectorAll('.dropdown').forEach(d => {
+    d.classList.remove('open');
+  });
+});
+
+/* =========================
+   DRAG & DROP (UNCHANGED)
+========================= */
+
+let dragged = null;
+
+document.addEventListener('dragstart', e => {
+  const widget = e.target.closest('.widget');
+  if (widget) {
+    dragged = widget;
+    widget.classList.add('dragging');
+  }
+});
+
+document.addEventListener('dragend', e => {
+  const widget = e.target.closest('.widget');
+  if (widget) {
+    widget.classList.remove('dragging');
+    dragged = null;
+  }
+});
+
+document.addEventListener('dragover', e => {
+  e.preventDefault();
+
+  const targetWidget = e.target.closest('.widget');
+
+  if (!targetWidget || !dragged || targetWidget === dragged) return;
+
+  const grid = document.getElementById('widgetGrid');
+
+  const draggedWrapper = dragged.parentElement;
+  const targetWrapper = targetWidget.parentElement;
+
+  const children = Array.from(grid.children);
+
+  const draggedIndex = children.indexOf(draggedWrapper);
+  const targetIndex = children.indexOf(targetWrapper);
+
+  if (draggedIndex < targetIndex) {
+    grid.insertBefore(draggedWrapper, targetWrapper.nextSibling);
+  } else {
+    grid.insertBefore(draggedWrapper, targetWrapper);
+  }
+});
+
+/* =========================
+   CREATE WIDGETS
+========================= */
+
+const grid = document.getElementById('widgetGrid');
+
+document.getElementById('addTableWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-large');
+  grid.appendChild(wrapper);
+
+  new TableWidget(wrapper);
+};
+
+document.getElementById('addChartWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-small');
+  grid.appendChild(wrapper);
+
+  new ChartWidget(wrapper);
+};
+
+</script>
+<footer>© TICRA foundation</footer>
+</body>
+</html>

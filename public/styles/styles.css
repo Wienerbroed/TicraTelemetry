@@ -123,13 +123,16 @@ body > *:not(header):not(footer):not(#tableContainerWrapper) {
 #tableContainerWrapper {
   width: 46%;
   margin-left: 20px;
-  overflow-x: auto;
-  display: block;
+  overflow: hidden;   /* prevent outer scroll */
+  display: flex;      /* IMPORTANT */
 }
 
 #tableContainer {
-  width: max-content;
-  min-width: 100%;
+  flex: 1;            /* fill widget */
+  min-width: 0;       /* CRITICAL for scroll */
+  min-height: 0;      /* CRITICAL for scroll */
+  overflow-x: auto;    /* horizontal scroll */
+  overflow-y: auto;
 }
 
 /* =========================
@@ -139,7 +142,8 @@ body > *:not(header):not(footer):not(#tableContainerWrapper) {
 #bigTable {
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: fixed;
+  table-layout: auto;   /* ❗ CHANGE FROM fixed → auto */
+  width: max-content;   /* ❗ ADD THIS */
 }
 
 /* LEFT ALIGN ONLY OPERATION CELLS */
@@ -410,3 +414,4 @@ th {
   position: relative;
   margin-bottom: 5px;
 }
+
