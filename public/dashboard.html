@@ -12,87 +12,6 @@
 
 <style>
 
-/* =========================
-   GRID
-========================= */
-
-#widgetGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  padding: 16px;
-}
-
-/* =========================
-   GRID SPANS
-========================= */
-
-.widget-small { grid-column: span 1; }
-.widget-large { grid-column: span 2; }
-.widget-full { grid-column: span 4; }
-
-/* =========================
-   WIDGET
-========================= */
-
-.widget {
-  height: 450px;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background: #fff;
-  position: relative;
-  cursor: grab;
-  overflow: visible;
-}
-
-.widget.dragging {
-  opacity: 0.5;
-}
-
-/* =========================
-   RESIZE CONTROLS
-========================= */
-
-.resize-controls-right {
-  position: absolute;
-  top: 50%;
-  right: -10px; /* pull outside the widget */
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  z-index: 100;
-}
-
-.resize-controls-bottom {
-  position: absolute;
-  bottom: -10px; /* pull outside the widget */
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  z-index: 100;
-}
-
-.resize-controls-right button,
-.resize-controls-bottom button {
-  width: 20px;
-  height: 20px;
-  border: 1px solid #ccc;
-  background: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-
-/* Optional: slightly better visibility */
-.resize-controls-right button:hover,
-.resize-controls-bottom button:hover {
-  background: #eee;
-}
 
 </style>
 
@@ -104,6 +23,7 @@
     <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
     <a href="data.html"> Event DataPool </a>
     <a href="session.html"> Sessions </a>
+    <a href="dashboard.html">Dashboard</a>
   </div>
 </header>
 
