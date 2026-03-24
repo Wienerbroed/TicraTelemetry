@@ -22,19 +22,24 @@ export function createCell(value, bold=false, bg=null, className=null) {
 export function downloadTableCSV(tableId = 'bigTable', filename = 'session_data.csv') {
     const table = document.getElementById(tableId);
     if (!table) return;
+
     const rows = [];
     table.querySelectorAll('thead tr, tbody tr').forEach(tr => {
         const cells = Array.from(tr.querySelectorAll('th,td'));
         rows.push(cells.map(c => c.innerText.trim().replace(/[\r\n\t]+/g, ' ')).join(';'));
     });
+
     const csvContent = '\uFEFF' + rows.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+
     document.body.appendChild(a);
     a.click();
+
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
@@ -42,39 +47,47 @@ export function downloadTableCSV(tableId = 'bigTable', filename = 'session_data.
 // ---------------- STICKY ----------------
 export function applyStickyColumns(table, numColumns = 0) {
     if (!table) return;
-    const wrapper = table.closest('#tableContainerWrapper');
+
+    // FIX: fallback to parent if wrapper doesn't exist (widgets!)
+    const wrapper = table.closest('#tableContainerWrapper') || table.parentElement;
+
     const thead = table.querySelector('thead');
     const tbody = table.querySelector('tbody');
+
     if (!thead || !tbody) return;
 
     const headers = [];
     const cellsPerColumn = [];
 
-    // Collect sticky columns and cells
     for (let col = 0; col < numColumns; col++) {
         const header = thead.querySelector(`th:nth-child(${col + 1})`);
         const cells = [...tbody.querySelectorAll(`td:nth-child(${col + 1})`)];
+
+        if (!header) continue;
+
         headers.push(header);
         cellsPerColumn.push(cells);
 
-        // Ensure background is applied
         header.style.backgroundColor = '#fff';
         cells.forEach(td => td.style.backgroundColor = '#fff');
     }
 
     function updateSticky() {
         let leftOffset = 0;
+
         for (let col = 0; col < numColumns; col++) {
             const header = headers[col];
             const cells = cellsPerColumn[col];
 
-            // Sticky header
+            if (!header) continue;
+
+            const width = header.getBoundingClientRect().width;
+
             header.style.position = 'sticky';
             header.style.left = `${leftOffset}px`;
             header.style.zIndex = 500;
             header.style.backgroundColor = '#fff';
 
-            // Sticky cells
             cells.forEach(td => {
                 td.style.position = 'sticky';
                 td.style.left = `${leftOffset}px`;
@@ -82,30 +95,34 @@ export function applyStickyColumns(table, numColumns = 0) {
                 td.style.backgroundColor = '#fff';
             });
 
-            leftOffset += header.getBoundingClientRect().width;
+            leftOffset += width;
         }
     }
 
-    // Update on scroll and resize
-    wrapper.addEventListener('scroll', updateSticky);
+    if (wrapper) {
+        wrapper.addEventListener('scroll', updateSticky);
+    }
+
     window.addEventListener('resize', updateSticky);
 
-    // Initial update
     updateSticky();
 }
 
 // ---------------- SORT ----------------
 export function sortTableByRow(table, row, sortStateObj, startCol=1, endColOverride=null, nonSortableCount=0) {
     const key = row.dataset.tab ?? row.dataset.operation;
+
     if(!sortStateObj[key]) sortStateObj[key] = 0;
-    sortStateObj[key] = (sortStateObj[key]+1)%3;
+    sortStateObj[key] = (sortStateObj[key] + 1) % 3;
+
     const state = sortStateObj[key];
 
     const tbody = table.querySelector("tbody");
     const rows = Array.from(tbody.querySelectorAll("tr"));
     const header = table.querySelector("thead tr");
+
     const totalCols = header.children.length;
-    const start = startCol + nonSortableCount;       
+    const start = startCol + nonSortableCount;
     const end = endColOverride ?? totalCols;
 
     const values = Array.from(row.children).slice(start, end).map(td => {
@@ -129,7 +146,9 @@ export function sortTableByRow(table, row, sortStateObj, startCol=1, endColOverr
         const left = cells.slice(0, start);
         const middle = sortedIndexes.map(i => cells[i+start]);
         const right = cells.slice(end);
+
         r.innerHTML = "";
+
         left.forEach(c => r.appendChild(c));
         middle.forEach(c => r.appendChild(c));
         right.forEach(c => r.appendChild(c));
@@ -139,7 +158,9 @@ export function sortTableByRow(table, row, sortStateObj, startCol=1, endColOverr
     const leftHeader = headerCells.slice(0, start);
     const middleHeader = sortedIndexes.map(i => headerCells[i+start]);
     const rightHeader = headerCells.slice(end);
+
     header.innerHTML = "";
+
     leftHeader.forEach(c => header.appendChild(c));
     middleHeader.forEach(c => header.appendChild(c));
     rightHeader.forEach(c => header.appendChild(c));
@@ -156,10 +177,13 @@ export function formatSecondsToHMS(sec){
 export function createRotatedHeader(text, sticky=false, isUser=false){
     const th = document.createElement("th");
     th.classList.add("rotate");
+
     if(sticky) th.classList.add("sticky");
     if(isUser) th.classList.add("user-cell");
+
     const div = document.createElement("div");
     div.textContent = text;
+
     th.appendChild(div);
     return th;
 }
@@ -167,9 +191,12 @@ export function createRotatedHeader(text, sticky=false, isUser=false){
 export function applyColumnHeatmap(table){
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
+
     const rows = Array.from(tbody.querySelectorAll('tr'));
     if (!rows.length) return;
+
     const headerCells = table.querySelectorAll('thead th');
+
     let firstUserColIndex = 0;
 
     for (let i = 0; i < headerCells.length; i++) {
@@ -182,14 +209,18 @@ export function applyColumnHeatmap(table){
     for (let col = firstUserColIndex; col < headerCells.length; col++) {
         const columnValues = rows.map(r => parseFloat(r.children[col].dataset.sort ?? r.children[col].textContent) || 0);
         const maxVal = Math.max(...columnValues);
+
         if(maxVal === 0) continue;
 
         rows.forEach((r) => {
             const td = r.children[col];
             const val = parseFloat(td.dataset.sort ?? td.textContent) || 0;
+
             const intensity = Math.pow(val / maxVal, 0.5);
+
             const hue = 120;
             const lightness = 100 - intensity * 60;
+
             td.style.backgroundColor = `hsl(${hue}, 70%, ${lightness}%)`;
             td.style.color = intensity > 0.6 ? '#fff' : '#000';
         });
@@ -198,15 +229,19 @@ export function applyColumnHeatmap(table){
 
 export function attachSortableRows(table, sortState){
     const headerCells = table.querySelectorAll('thead th');
+
     let firstDataColIndex = 0;
+
     for(let i=0;i<headerCells.length;i++){
         if(headerCells[i].classList.contains('user-cell')){
             firstDataColIndex=i;
             break;
         }
     }
+
     table.querySelectorAll('tbody tr').forEach(tr=>{
         tr.classList.add('sortable');
+
         tr.addEventListener('click',()=>{
             sortTableByRow(table,tr,sortState,firstDataColIndex); 
             applyColumnHeatmap(table);
@@ -214,30 +249,39 @@ export function attachSortableRows(table, sortState){
     });
 }
 
+// ---------------- RESIZE ----------------
 export function makeColumnsResizable(table) {
-    const headers = table.querySelectorAll('td');
+    const headers = table.querySelectorAll('thead th');
 
     headers.forEach(th => {
+        if (th.querySelector('.resize-handle')) return;
+
         th.classList.add('resizable');
 
-        // create handle
         const handle = document.createElement('div');
         handle.classList.add('resize-handle');
+
         th.appendChild(handle);
 
         let startX, startWidth;
 
         handle.addEventListener('mousedown', e => {
             e.preventDefault();
+
             startX = e.pageX;
             startWidth = th.offsetWidth;
 
+            const index = Array.from(th.parentElement.children).indexOf(th);
+
             const onMouseMove = e => {
                 const newWidth = startWidth + (e.pageX - startX);
+
                 th.style.width = `${newWidth}px`;
-                const index = Array.from(th.parentElement.children).indexOf(th);
+
                 table.querySelectorAll('tbody tr').forEach(tr => {
-                    tr.children[index].style.width = `${newWidth}px`;
+                    if (tr.children[index]) {
+                        tr.children[index].style.width = `${newWidth}px`;
+                    }
                 });
             };
 
@@ -251,4 +295,3 @@ export function makeColumnsResizable(table) {
         });
     });
 }
-

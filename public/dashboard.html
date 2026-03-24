@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Event Pool Widgets</title>
+
+<link rel="stylesheet" href="styles/styles.css">
+<link rel="stylesheet" href="styles/data.css">
+<link rel="stylesheet" href="styles/dashboard.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+/* =========================
+   GRID
+========================= */
+
+#widgetGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+/* =========================
+   GRID SPANS
+========================= */
+
+.widget-small { grid-column: span 1; }
+.widget-large { grid-column: span 2; }
+.widget-full { grid-column: span 4; }
+
+/* =========================
+   WIDGET
+========================= */
+
+.widget {
+  height: 450px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  position: relative;
+  cursor: grab;
+  overflow: visible;
+}
+
+.widget.dragging {
+  opacity: 0.5;
+}
+
+/* =========================
+   RESIZE CONTROLS
+========================= */
+
+.resize-controls-right {
+  position: absolute;
+  top: 50%;
+  right: -10px; /* pull outside the widget */
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.resize-controls-bottom {
+  position: absolute;
+  bottom: -10px; /* pull outside the widget */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  z-index: 100;
+}
+
+.resize-controls-right button,
+.resize-controls-bottom button {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* Optional: slightly better visibility */
+.resize-controls-right button:hover,
+.resize-controls-bottom button:hover {
+  background: #eee;
+}
+
+</style>
+
+</head>
+
+<body>
+  <header>
+  <div class="navbar">
+    <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
+    <a href="data.html"> Event DataPool </a>
+    <a href="session.html"> Sessions </a>
+  </div>
+</header>
+
+<h1 style="padding:16px;">Event Pool Viewer</h1>
+
+<div style="padding: 16px;">
+  <button id="addTableWidgetBtn">+ Add Table Widget</button>
+  <button id="addChartWidgetBtn">+ Add Chart Widget</button>
+</div>
+
+<div id="widgetGrid"></div>
+
+<script type="module">
+
+import { TableWidget } from './scripts/dashboardTable.js';
+import { ChartWidget } from './scripts/dashboardChart.js';
+
+/* =========================
+   DROPDOWN (UNCHANGED)
+========================= */
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.dropdown')) return;
+
+  document.querySelectorAll('.dropdown').forEach(d => {
+    d.classList.remove('open');
+  });
+});
+
+/* =========================
+   DRAG & DROP (UNCHANGED)
+========================= */
+
+let dragged = null;
+
+document.addEventListener('dragstart', e => {
+  const widget = e.target.closest('.widget');
+  if (widget) {
+    dragged = widget;
+    widget.classList.add('dragging');
+  }
+});
+
+document.addEventListener('dragend', e => {
+  const widget = e.target.closest('.widget');
+  if (widget) {
+    widget.classList.remove('dragging');
+    dragged = null;
+  }
+});
+
+document.addEventListener('dragover', e => {
+  e.preventDefault();
+
+  const targetWidget = e.target.closest('.widget');
+
+  if (!targetWidget || !dragged || targetWidget === dragged) return;
+
+  const grid = document.getElementById('widgetGrid');
+
+  const draggedWrapper = dragged.parentElement;
+  const targetWrapper = targetWidget.parentElement;
+
+  const children = Array.from(grid.children);
+
+  const draggedIndex = children.indexOf(draggedWrapper);
+  const targetIndex = children.indexOf(targetWrapper);
+
+  if (draggedIndex < targetIndex) {
+    grid.insertBefore(draggedWrapper, targetWrapper.nextSibling);
+  } else {
+    grid.insertBefore(draggedWrapper, targetWrapper);
+  }
+});
+
+/* =========================
+   CREATE WIDGETS
+========================= */
+
+const grid = document.getElementById('widgetGrid');
+
+document.getElementById('addTableWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-large');
+  grid.appendChild(wrapper);
+
+  new TableWidget(wrapper);
+};
+
+document.getElementById('addChartWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-small');
+  grid.appendChild(wrapper);
+
+  new ChartWidget(wrapper);
+};
+
+</script>
+<footer>© TICRA foundation</footer>
+</body>
+</html>
