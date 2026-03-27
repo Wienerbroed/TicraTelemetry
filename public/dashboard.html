@@ -42,55 +42,6 @@
     width: 100% !important;
     height: 100% !important;
   }
-
-  /* Timeline widget */
-  .timeline-container {
-    display: none;
-    position: relative;
-    margin-top: 16px;
-    border: 1px solid #ccc;
-    padding: 8px;
-    overflow-x: auto;
-  }
-
-  .event-box {
-    display: flex;
-    height: 40px;
-    margin-bottom: 2px;
-  }
-
-  .event-line {
-    position: absolute;
-    width: 2px;
-    background: #333;
-  }
-
-  .focus-line {
-    background: #000;
-  }
-
-  .focus-segment {
-    background-color: #888 !important;
-  }
-
-  #tooltip {
-    position: absolute;
-    display: none;
-    padding: 4px 8px;
-    background: rgba(0,0,0,0.8);
-    color: #fff;
-    border-radius: 4px;
-    font-size: 12px;
-    pointer-events: none;
-    z-index: 999;
-    white-space: pre-line;
-  }
-
-  .timeline-controls {
-    margin-bottom: 8px;
-    display: flex;
-    gap: 6px;
-  }
 </style>
 </head>
 <body>
@@ -115,18 +66,14 @@
 
 <div id="widgetGrid"></div>
 
-<!-- Timeline tooltip -->
-<div id="tooltip"></div>
-
 <script type="module">
 
 import { TableWidget } from './scripts/dashboardTable.js';
 import { ChartWidget } from './scripts/dashboardChart.js';
-import { SessionTableWidget, buildSessionTable } from './scripts/dashboardTable.js';
+import { SessionTableWidget } from './scripts/dashboardTable.js';
 import { SessionChartWidget } from './scripts/dashboardChart.js';
 import { fetchJson } from './scripts/utils.js';
 import { Widget } from './scripts/widgets.js';
-import { loadTimeline } from './scripts/timeline.js'; // Timeline logic
 
 /* =========================
    WIDGET ADD BUTTONS
@@ -151,29 +98,7 @@ document.getElementById('addSessionWidgetBtn').onclick = () => {
   const wrapper = document.createElement('div');
   wrapper.classList.add('widget-large');
   grid.appendChild(wrapper);
-  const st = new SessionTableWidget(wrapper);
-
-  // ------------------------
-  // Enable sessionId click to open timeline
-  // ------------------------
-  const originalBuild = buildSessionTable;
-  buildSessionTable = async (container, options) => {
-    await originalBuild(container, options);
-
-    // Find all session ID cells (employee-type=user) and make them clickable
-    const table = container.querySelector('table');
-    if (!table) return;
-    const tbody = table.querySelector('tbody');
-
-    [...tbody.querySelectorAll('td')].forEach(td => {
-      const text = td.textContent.trim();
-      if (/^[a-f0-9\-]{8,}$/i.test(text)) { // rough UUID/sessionId pattern
-        td.style.cursor = 'pointer';
-        td.style.textDecoration = 'underline';
-        td.onclick = () => addTimelineWidget(text);
-      }
-    });
-  };
+  new SessionTableWidget(wrapper);
 };
 
 document.getElementById('addSessionChartWidgetBtn').onclick = () => {
@@ -182,35 +107,6 @@ document.getElementById('addSessionChartWidgetBtn').onclick = () => {
   grid.appendChild(wrapper);
   new SessionChartWidget(wrapper);
 };
-
-/* =========================
-   TIMELINE WIDGET
-========================= */
-function addTimelineWidget(sessionId) {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-large');
-  wrapper.style.minHeight = '150px';
-
-  wrapper.innerHTML = `
-    <div class="widget" draggable="true">
-      <div class="widget-header" contenteditable="true">Timeline - ${sessionId}</div>
-      <div class="timeline-controls">
-        <button id="zoomInBtn">Zoom In</button>
-        <button id="zoomOutBtn">Zoom Out</button>
-        <button id="zoomResetBtn">Reset</button>
-        <button id="toggleFocusBtn">Toggle Focus</button>
-      </div>
-      <div class="timeline-container" id="timelineContainer">
-        <div id="timeline"></div>
-        <div id="timelineLegend"></div>
-        <div id="timelineSummary"></div>
-      </div>
-    </div>
-  `;
-
-  grid.appendChild(wrapper);
-  loadTimeline(sessionId);
-}
 
 /* =========================
    DRAG & DROP WIDGETS
