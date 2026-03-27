@@ -154,14 +154,25 @@ export class TableWidget extends Widget {
 /* =========================
    SESSION TABLE UTILS
 ========================= */
+/* =========================
+   SESSION TABLE UTILS
+========================= */
 export async function buildSessionTable(container, { start, end, eventType, employee }) {
   const params = new URLSearchParams();
   params.append("configTitle", eventType);
   params.append("startTime", start);
   params.append("endTime", end);
 
-  if (employee) params.append("employee_type", employee.type === "type" ? employee.value : undefined);
-  if (employee && employee.type === "user") params.append("user_name", employee.value);
+  // ------------------------
+  // Employee filtering
+  // ------------------------
+  if (employee) {
+    if (employee.type === "type") {
+      params.append("employee_type", employee.value);
+    } else if (employee.type === "user") {
+      params.append("user_name", employee.value);
+    }
+  }
 
   const data = await fetchJson(`/session?${params}`);
   const sessions = data.sessions || [];
@@ -172,9 +183,14 @@ export async function buildSessionTable(container, { start, end, eventType, empl
   thead.innerHTML = '';
   tbody.innerHTML = '';
 
-  if (!sessions.length) return;
+  if (!sessions.length) {
+    tbody.innerHTML = '<tr><td colspan="100%">No sessions found for this selection</td></tr>';
+    return;
+  }
 
+  // ------------------------
   // Group sessions by user
+  // ------------------------
   const perUser = {};
   sessions.forEach(s => {
     const u = s.user_name || "Unknown";
@@ -182,6 +198,9 @@ export async function buildSessionTable(container, { start, end, eventType, empl
     perUser[u].push(s);
   });
 
+  // ------------------------
+  // Columns & Tabs
+  // ------------------------
   let columns;
   if (employee && employee.type === "user") {
     columns = [...new Set(sessions.map(s => s.session_id))].sort();
@@ -191,7 +210,9 @@ export async function buildSessionTable(container, { start, end, eventType, empl
 
   const tabs = [...new Set(sessions.map(s => s.tab))].sort();
 
+  // ------------------------
   // HEADER
+  // ------------------------
   const hr = document.createElement('tr');
   const colHeaders = ['Operation', 'AVG', 'TOTAL', ...columns];
   colHeaders.forEach((t, i) => {
@@ -206,14 +227,18 @@ export async function buildSessionTable(container, { start, end, eventType, empl
   });
   thead.appendChild(hr);
 
+  // ------------------------
   // ROWS
+  // ------------------------
   tabs.forEach(tab => {
     const tr = document.createElement('tr');
 
+    // Operation name
     const opTd = document.createElement('td');
     opTd.textContent = tab;
     tr.appendChild(opTd);
 
+    // Session values
     const vals = columns.map(col => {
       if (employee && employee.type === "user") {
         return sessions
@@ -250,7 +275,9 @@ export async function buildSessionTable(container, { start, end, eventType, empl
   setStickyColumns(table);
 }
 
+// ------------------------
 // Helper functions
+// ------------------------
 function createCell(text) {
   const td = document.createElement('td');
   td.textContent = text;
