@@ -154,18 +154,12 @@ export class TableWidget extends Widget {
 /* =========================
    SESSION TABLE UTILS
 ========================= */
-/* =========================
-   SESSION TABLE UTILS
-========================= */
 export async function buildSessionTable(container, { start, end, eventType, employee }) {
   const params = new URLSearchParams();
   params.append("configTitle", eventType);
   params.append("startTime", start);
   params.append("endTime", end);
 
-  // ------------------------
-  // Employee filtering
-  // ------------------------
   if (employee) {
     if (employee.type === "type") {
       params.append("employee_type", employee.value);
@@ -188,9 +182,6 @@ export async function buildSessionTable(container, { start, end, eventType, empl
     return;
   }
 
-  // ------------------------
-  // Group sessions by user
-  // ------------------------
   const perUser = {};
   sessions.forEach(s => {
     const u = s.user_name || "Unknown";
@@ -198,9 +189,6 @@ export async function buildSessionTable(container, { start, end, eventType, empl
     perUser[u].push(s);
   });
 
-  // ------------------------
-  // Columns & Tabs
-  // ------------------------
   let columns;
   if (employee && employee.type === "user") {
     columns = [...new Set(sessions.map(s => s.session_id))].sort();
@@ -210,9 +198,7 @@ export async function buildSessionTable(container, { start, end, eventType, empl
 
   const tabs = [...new Set(sessions.map(s => s.tab))].sort();
 
-  // ------------------------
   // HEADER
-  // ------------------------
   const hr = document.createElement('tr');
   const colHeaders = ['Operation', 'AVG', 'TOTAL', ...columns];
   colHeaders.forEach((t, i) => {
@@ -228,17 +214,30 @@ export async function buildSessionTable(container, { start, end, eventType, empl
   thead.appendChild(hr);
 
   // ------------------------
-  // ROWS
+  // COLUMN-BASED HEATMAP
   // ------------------------
+  const columnMaxes = columns.map((col, colIndex) => {
+    return Math.max(...tabs.map(tab => {
+      if (employee && employee.type === "user") {
+        return sessions
+          .filter(s => s.tab === tab && s.session_id === col)
+          .reduce((a, b) => a + b.durationSeconds, 0);
+      } else {
+        return (perUser[col] || [])
+          .filter(s => s.tab === tab)
+          .reduce((a, b) => a + b.durationSeconds, 0);
+      }
+    }));
+  });
+
+  // ROWS
   tabs.forEach(tab => {
     const tr = document.createElement('tr');
 
-    // Operation name
     const opTd = document.createElement('td');
     opTd.textContent = tab;
     tr.appendChild(opTd);
 
-    // Session values
     const vals = columns.map(col => {
       if (employee && employee.type === "user") {
         return sessions
@@ -262,10 +261,10 @@ export async function buildSessionTable(container, { start, end, eventType, empl
     totalTd.classList.add('total');
     tr.appendChild(totalTd);
 
-    const max = Math.max(...vals);
-    vals.forEach(v => {
+    // DATA CELLS WITH COLUMN HEATMAP
+    vals.forEach((v, colIndex) => {
       const td = createCell(formatTime(v));
-      td.style.background = heatColor(v, max);
+      td.style.background = heatColor(v, columnMaxes[colIndex]);
       tr.appendChild(td);
     });
 
@@ -275,9 +274,7 @@ export async function buildSessionTable(container, { start, end, eventType, empl
   setStickyColumns(table);
 }
 
-// ------------------------
 // Helper functions
-// ------------------------
 function createCell(text) {
   const td = document.createElement('td');
   td.textContent = text;
