@@ -318,3 +318,87 @@ thead th {
 .resize-controls-bottom button:hover {
   background: #eee;
 }
+
+/* FILTERS */
+.filters {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-bottom:10px;
+}
+
+/* SESSION TABLE */
+.sessionTable, table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.sessionTable th,
+.sessionTable td,
+table th,
+table td {
+  padding:4px 6px;
+  border:1px solid #ddd;
+  text-align:center;
+}
+
+/* HEADER ROW STICKY */
+.sessionTable thead th,
+table thead th {
+  position: sticky;
+  top:0;
+  background:#f5f5f5;
+  z-index:3;
+}
+
+/* ROTATED HEADER */
+.sessionTable th.rotate > div,
+table th.rotate > div {
+  transform: rotate(-0deg);
+  transform-origin: bottom left;
+  white-space: nowrap;
+  font-size:11px;
+  padding:4px;
+}
+
+/* EDITABLE TITLE */
+.widget-header[contenteditable="true"] {
+  border-bottom:1px dashed #aaa;
+  cursor:text;
+}
+
+/* SUMMARY UNDER TITLE */
+.widget-summary {
+  font-size:12px;
+  color:#333;
+  margin:4px 0 8px 0;
+}
+
+/* STICKY FIRST 3 COLUMNS */
+.sessionTable td.sticky,
+.sessionTable th.sticky,
+table td.sticky,
+table th.sticky {
+  position: sticky;
+  background: #f5f5f5;
+  z-index:2;
+}
+
+/* AVG / TOTAL COLUMN COLORS */
+.sessionTable td.avg,
+.sessionTable th.avg,
+.sessionTable td.total,
+.sessionTable th.total,
+table td.avg,
+table th.avg,
+table td.total,
+table th.total {
+  background:#ddd;
+}
+
+/* HOVER ONLY ON FIRST 3 COLUMNS */
+.sessionTable tbody tr:hover td.sticky,
+table tbody tr:hover td.sticky {
+  background:#fff8b0 !important;
+}

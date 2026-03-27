@@ -9,93 +9,40 @@
 <link rel="stylesheet" href="styles/dashboard.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
-/* FILTERS */
-.filters {
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-bottom:10px;
-}
+  /* Slider styling */
+  .format-slider {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 4px 0;
+    margin-bottom: 8px;
+  }
+  .format-slider button {
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .format-slider button.active {
+    background: #007bff;
+    color: #fff;
+    border-color: #007bff;
+  }
 
-/* SESSION TABLE */
-.sessionTable, table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 12px;
-}
+  /* Chart wrapper */
+  .chartWrapper {
+    position: relative;
+    width: 100%;
+    height: 300px;
+  }
 
-.sessionTable th,
-.sessionTable td,
-table th,
-table td {
-  padding:4px 6px;
-  border:1px solid #ddd;
-  text-align:center;
-}
-
-/* HEADER ROW STICKY */
-.sessionTable thead th,
-table thead th {
-  position: sticky;
-  top:0;
-  background:#f5f5f5;
-  z-index:3;
-}
-
-/* ROTATED HEADER */
-.sessionTable th.rotate > div,
-table th.rotate > div {
-  transform: rotate(-0deg);
-  transform-origin: bottom left;
-  white-space: nowrap;
-  font-size:11px;
-  padding:4px;
-}
-
-/* EDITABLE TITLE */
-.widget-header[contenteditable="true"] {
-  border-bottom:1px dashed #aaa;
-  cursor:text;
-}
-
-/* SUMMARY UNDER TITLE */
-.widget-summary {
-  font-size:12px;
-  color:#333;
-  margin:4px 0 8px 0;
-}
-
-/* STICKY FIRST 3 COLUMNS */
-.sessionTable td.sticky,
-.sessionTable th.sticky,
-table td.sticky,
-table th.sticky {
-  position: sticky;
-  background: #f5f5f5;
-  z-index:2;
-}
-
-/* AVG / TOTAL COLUMN COLORS */
-.sessionTable td.avg,
-.sessionTable th.avg,
-.sessionTable td.total,
-.sessionTable th.total,
-table td.avg,
-table th.avg,
-table td.total,
-table th.total {
-  background:#ddd;
-}
-
-/* HOVER ONLY ON FIRST 3 COLUMNS */
-.sessionTable tbody tr:hover td.sticky,
-table tbody tr:hover td.sticky {
-  background:#fff8b0 !important;
-}
+  .chartCanvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
 </style>
-
 </head>
 <body>
 
@@ -114,6 +61,7 @@ table tbody tr:hover td.sticky {
   <button id="addTableWidgetBtn">+ Add Table Widget</button>
   <button id="addChartWidgetBtn">+ Add Chart Widget</button>
   <button id="addSessionWidgetBtn">+ Add Session Table</button>
+  <button id="addSessionChartWidgetBtn">+ Add Session Chart</button>
 </div>
 
 <div id="widgetGrid"></div>
@@ -122,52 +70,68 @@ table tbody tr:hover td.sticky {
 
 import { TableWidget } from './scripts/dashboardTable.js';
 import { ChartWidget } from './scripts/dashboardChart.js';
-import { SessionTableWidget, buildSessionTable } from './scripts/dashboardTable.js';
+import { SessionTableWidget } from './scripts/dashboardTable.js';
+import { SessionChartWidget } from './scripts/dashboardChart.js';
+import { fetchJson } from './scripts/utils.js';
+import { Widget } from './scripts/widgets.js';
 
 /* =========================
-   EXISTING WIDGET SYSTEM
+   WIDGET ADD BUTTONS
 ========================= */
 const grid = document.getElementById('widgetGrid');
 
 document.getElementById('addTableWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div'); wrapper.classList.add('widget-large'); grid.appendChild(wrapper);
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-large');
+  grid.appendChild(wrapper);
   new TableWidget(wrapper);
 };
 
 document.getElementById('addChartWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div'); wrapper.classList.add('widget-small'); grid.appendChild(wrapper);
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-small');
+  grid.appendChild(wrapper);
   new ChartWidget(wrapper);
 };
 
 document.getElementById('addSessionWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div'); wrapper.classList.add('widget-large'); grid.appendChild(wrapper);
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-large');
+  grid.appendChild(wrapper);
   new SessionTableWidget(wrapper);
 };
 
+document.getElementById('addSessionChartWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-small');
+  grid.appendChild(wrapper);
+  new SessionChartWidget(wrapper);
+};
+
 /* =========================
-   DRAG & DROP
+   DRAG & DROP WIDGETS
 ========================= */
-let dragged=null;
+let dragged = null;
 
-document.addEventListener('dragstart', e=>{
-  const w=e.target.closest('.widget');
-  if(w){dragged=w; w.classList.add('dragging');}
+document.addEventListener('dragstart', e => {
+  const w = e.target.closest('.widget');
+  if (w) { dragged = w; w.classList.add('dragging'); }
 });
 
-document.addEventListener('dragend', e=>{
-  const w=e.target.closest('.widget');
-  if(w){w.classList.remove('dragging'); dragged=null;}
+document.addEventListener('dragend', e => {
+  const w = e.target.closest('.widget');
+  if (w) { w.classList.remove('dragging'); dragged = null; }
 });
 
-document.addEventListener('dragover', e=>{
+document.addEventListener('dragover', e => {
   e.preventDefault();
-  const target=e.target.closest('.widget');
-  if(!target||!dragged||target===dragged) return;
-  const children=[...grid.children];
-  const a=children.indexOf(dragged.parentElement);
-  const b=children.indexOf(target.parentElement);
-  if(a<b) grid.insertBefore(dragged.parentElement,target.parentElement.nextSibling);
-  else grid.insertBefore(dragged.parentElement,target.parentElement);
+  const target = e.target.closest('.widget');
+  if (!target || !dragged || target === dragged) return;
+  const children = [...grid.children];
+  const a = children.indexOf(dragged.parentElement);
+  const b = children.indexOf(target.parentElement);
+  if (a < b) grid.insertBefore(dragged.parentElement, target.parentElement.nextSibling);
+  else grid.insertBefore(dragged.parentElement, target.parentElement);
 });
 
 </script>

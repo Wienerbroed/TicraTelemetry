@@ -273,3 +273,166 @@ export class ChartWidget extends Widget {
     });
   }
 }
+
+export class SessionChartWidget extends Widget {
+  constructor(wrapper) {
+    super(wrapper);
+    this.wrapper = wrapper;
+    this.currentFormat = 'seconds';
+    this.chartData = { labels: [], values: [] };
+
+    const now = new Date();
+    const past = new Date();
+    past.setDate(now.getDate() - 10);
+    const f = d => d.toISOString().slice(0,16);
+
+    this.wrapper.innerHTML = `
+      <div class="widget" draggable="true">
+        <div class="widget-header" contenteditable="true">Session Chart</div>
+        <div class="widget-summary"></div>
+        <div class="widget-body">
+          <div class="filters">
+            <input type="datetime-local" class="startTime" value="${f(past)}">
+            <input type="datetime-local" class="endTime" value="${f(now)}">
+            <select class="eventType"><option value="">Event Type</option></select>
+            <select class="employee"><option value="">All</option></select>
+            <button class="applyBtn">Apply</button>
+          </div>
+          <div class="chartWrapper">
+            <div class="format-slider"></div>
+            <canvas class="chartCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+    `;
+
+    this.cache();
+    this.loadDropdowns();
+    this.bind();
+  }
+
+  cache() {
+    this.start = this.wrapper.querySelector('.startTime');
+    this.end = this.wrapper.querySelector('.endTime');
+    this.eventType = this.wrapper.querySelector('.eventType');
+    this.employee = this.wrapper.querySelector('.employee');
+    this.applyBtn = this.wrapper.querySelector('.applyBtn');
+    this.chartWrapper = this.wrapper.querySelector('.chartWrapper');
+    this.summary = this.wrapper.querySelector('.widget-summary');
+    this.slider = this.wrapper.querySelector('.format-slider');
+    this.chartCanvas = this.wrapper.querySelector('.chartCanvas');
+  }
+
+  async loadDropdowns() {
+    const eventTypes = await fetchJson('/sessionTypes');
+    eventTypes.forEach(e => {
+      const o = document.createElement('option'); o.value = e; o.textContent = e;
+      this.eventType.appendChild(o);
+    });
+
+    const employeeTypes = await fetchJson('/employeeTypes');
+    const users = await fetchJson('/users');
+
+    if (employeeTypes.length) {
+      const g = document.createElement('optgroup'); g.label = "Employee Types";
+      employeeTypes.forEach(t=>{
+        const o = document.createElement('option'); o.value=t; o.textContent=t; o.dataset.type="type";
+        g.appendChild(o);
+      });
+      this.employee.appendChild(g);
+    }
+
+    if (users.length) {
+      const g = document.createElement('optgroup'); g.label="Employees";
+      users.forEach(u=>{
+        const o = document.createElement('option'); o.value=u; o.textContent=u; o.dataset.type="user";
+        g.appendChild(o);
+      });
+      this.employee.appendChild(g);
+    }
+  }
+
+  bind() {
+    ['%','sec','HH'].forEach(fmt=>{
+      const btn=document.createElement('button'); btn.textContent=fmt;
+      if(fmt==='sec') btn.classList.add('active');
+      btn.onclick=()=> {
+        this.currentFormat = fmt==='%'?'percent':fmt==='sec'?'seconds':'hhmmss';
+        this.slider.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        this.updateChartLabels();
+      };
+      this.slider.appendChild(btn);
+    });
+
+    this.applyBtn.onclick=async ()=>{
+      if(!this.eventType.value) return;
+
+      const empOpt = this.employee.value ? this.employee.selectedOptions[0] : null;
+      const employeeData = empOpt ? {value: empOpt.value,type: empOpt.dataset.type} : null;
+
+      const params = new URLSearchParams();
+      params.append("configTitle", this.eventType.value);
+      params.append("startTime", this.start.value);
+      params.append("endTime", this.end.value);
+      if(employeeData?.type==="type") params.append("employee_type", employeeData.value);
+      else if(employeeData?.type==="user") params.append("user_name", employeeData.value);
+
+      const data = await fetchJson(`/session?${params}`);
+      const sessions = data.sessions || [];
+      if(!sessions.length){ this.chartCanvas.style.display='none'; return; }
+
+      const perTab={};
+      sessions.forEach(s=>{
+        const tab=s.tab||"Unknown";
+        if(!perTab[tab]) perTab[tab]=0;
+        perTab[tab]+=s.durationSeconds;
+      });
+
+      this.chartData.labels=Object.keys(perTab);
+      this.chartData.values=Object.values(perTab);
+      this.chartCanvas.style.display='block';
+      this.renderChart();
+
+      const empText = employeeData?.value || "All";
+      this.summary.textContent = `${this.eventType.value} - ${empText} - ${this.start.value} → ${this.end.value}`;
+    };
+  }
+
+  formatValue(v){
+    const total = this.chartData.values.reduce((a,b)=>a+b,0);
+    if(this.currentFormat==='percent') return total?((v/total)*100).toFixed(1)+'%':'0%';
+    if(this.currentFormat==='seconds') return Math.round(v)+'s';
+    if(this.currentFormat==='hhmmss'){
+      const h=Math.floor(v/3600), m=Math.floor((v%3600)/60), s=Math.floor(v%60);
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    return v;
+  }
+
+  renderChart(){
+    if(this.chart) this.chart.destroy();
+    this.chart = new Chart(this.chartCanvas,{
+      type:'bar',
+      data:{ labels:this.chartData.labels,datasets:[{data:this.chartData.values, backgroundColor:this.chartData.labels.map((_,i)=>`hsl(${(i*60)%360},70%,60%)`)}] },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:ctx=>this.formatValue(ctx.raw)}}
+        },
+        scales:{
+          y:{beginAtZero:true,ticks:{callback:v=>this.formatValue(v)}, title:{display:true,text:'Duration'}}
+        }
+      }
+    });
+  }
+
+  updateChartLabels(){
+    if(!this.chart) return;
+    this.chart.options.scales.y.ticks.callback=v=>this.formatValue(v);
+    this.chart.options.plugins.tooltip.callbacks.label=ctx=>this.formatValue(ctx.raw);
+    this.chart.update();
+  }
+}
