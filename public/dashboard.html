@@ -9,107 +9,134 @@
 <link rel="stylesheet" href="styles/dashboard.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
+  /* Slider styling */
+  .format-slider {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 4px 0;
+    margin-bottom: 8px;
+  }
+  .format-slider button {
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .format-slider button.active {
+    background: #007bff;
+    color: #fff;
+    border-color: #007bff;
+  }
 
+  /* Chart wrapper */
+  .chartWrapper {
+    position: relative;
+    width: 100%;
+    height: 300px;
+  }
 
+  .chartCanvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* Timeline widget */
+  .timeline-container {
+    display: none;
+    position: relative;
+    margin-top: 16px;
+    border: 1px solid #ccc;
+    padding: 8px;
+    overflow-x: auto;
+  }
+
+  .event-box {
+    display: flex;
+    height: 40px;
+    margin-bottom: 2px;
+  }
+
+  .event-line {
+    position: absolute;
+    width: 2px;
+    background: #333;
+  }
+
+  .focus-line {
+    background: #000;
+  }
+
+  .focus-segment {
+    background-color: #888 !important;
+  }
+
+  #tooltip {
+    position: absolute;
+    display: none;
+    padding: 4px 8px;
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 999;
+    white-space: pre-line;
+  }
+
+  .timeline-controls {
+    margin-bottom: 8px;
+    display: flex;
+    gap: 6px;
+  }
 </style>
-
 </head>
-
 <body>
-  <header>
+
+<header>
   <div class="navbar">
-    <a href="index.html"><img src="images/ticra.png" alt="Home" class="nav-icon"></a>
-    <a href="data.html"> Event DataPool </a>
-    <a href="session.html"> Sessions </a>
+    <a href="index.html"><img src="images/ticra.png" class="nav-icon"></a>
+    <a href="data.html">Event DataPool</a>
+    <a href="session.html">Sessions</a>
     <a href="dashboard.html">Dashboard</a>
   </div>
 </header>
 
 <h1 style="padding:16px;">Event Pool Viewer</h1>
 
-<div style="padding: 16px;">
+<div style="padding:16px;">
   <button id="addTableWidgetBtn">+ Add Table Widget</button>
   <button id="addChartWidgetBtn">+ Add Chart Widget</button>
+  <button id="addSessionWidgetBtn">+ Add Session Table</button>
+  <button id="addSessionChartWidgetBtn">+ Add Session Chart</button>
 </div>
 
 <div id="widgetGrid"></div>
+
+<!-- Timeline tooltip -->
+<div id="tooltip"></div>
 
 <script type="module">
 
 import { TableWidget } from './scripts/dashboardTable.js';
 import { ChartWidget } from './scripts/dashboardChart.js';
+import { SessionTableWidget, buildSessionTable } from './scripts/dashboardTable.js';
+import { SessionChartWidget } from './scripts/dashboardChart.js';
+import { fetchJson } from './scripts/utils.js';
+import { Widget } from './scripts/widgets.js';
+import { loadTimeline } from './scripts/timeline.js'; // Timeline logic
 
 /* =========================
-   DROPDOWN (UNCHANGED)
+   WIDGET ADD BUTTONS
 ========================= */
-
-document.addEventListener('click', (e) => {
-  if (e.target.closest('.dropdown')) return;
-
-  document.querySelectorAll('.dropdown').forEach(d => {
-    d.classList.remove('open');
-  });
-});
-
-/* =========================
-   DRAG & DROP (UNCHANGED)
-========================= */
-
-let dragged = null;
-
-document.addEventListener('dragstart', e => {
-  const widget = e.target.closest('.widget');
-  if (widget) {
-    dragged = widget;
-    widget.classList.add('dragging');
-  }
-});
-
-document.addEventListener('dragend', e => {
-  const widget = e.target.closest('.widget');
-  if (widget) {
-    widget.classList.remove('dragging');
-    dragged = null;
-  }
-});
-
-document.addEventListener('dragover', e => {
-  e.preventDefault();
-
-  const targetWidget = e.target.closest('.widget');
-
-  if (!targetWidget || !dragged || targetWidget === dragged) return;
-
-  const grid = document.getElementById('widgetGrid');
-
-  const draggedWrapper = dragged.parentElement;
-  const targetWrapper = targetWidget.parentElement;
-
-  const children = Array.from(grid.children);
-
-  const draggedIndex = children.indexOf(draggedWrapper);
-  const targetIndex = children.indexOf(targetWrapper);
-
-  if (draggedIndex < targetIndex) {
-    grid.insertBefore(draggedWrapper, targetWrapper.nextSibling);
-  } else {
-    grid.insertBefore(draggedWrapper, targetWrapper);
-  }
-});
-
-/* =========================
-   CREATE WIDGETS
-========================= */
-
 const grid = document.getElementById('widgetGrid');
 
 document.getElementById('addTableWidgetBtn').onclick = () => {
   const wrapper = document.createElement('div');
   wrapper.classList.add('widget-large');
   grid.appendChild(wrapper);
-
   new TableWidget(wrapper);
 };
 
@@ -117,11 +144,102 @@ document.getElementById('addChartWidgetBtn').onclick = () => {
   const wrapper = document.createElement('div');
   wrapper.classList.add('widget-small');
   grid.appendChild(wrapper);
-
   new ChartWidget(wrapper);
 };
 
+document.getElementById('addSessionWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-large');
+  grid.appendChild(wrapper);
+  const st = new SessionTableWidget(wrapper);
+
+  // ------------------------
+  // Enable sessionId click to open timeline
+  // ------------------------
+  const originalBuild = buildSessionTable;
+  buildSessionTable = async (container, options) => {
+    await originalBuild(container, options);
+
+    // Find all session ID cells (employee-type=user) and make them clickable
+    const table = container.querySelector('table');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+
+    [...tbody.querySelectorAll('td')].forEach(td => {
+      const text = td.textContent.trim();
+      if (/^[a-f0-9\-]{8,}$/i.test(text)) { // rough UUID/sessionId pattern
+        td.style.cursor = 'pointer';
+        td.style.textDecoration = 'underline';
+        td.onclick = () => addTimelineWidget(text);
+      }
+    });
+  };
+};
+
+document.getElementById('addSessionChartWidgetBtn').onclick = () => {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-small');
+  grid.appendChild(wrapper);
+  new SessionChartWidget(wrapper);
+};
+
+/* =========================
+   TIMELINE WIDGET
+========================= */
+function addTimelineWidget(sessionId) {
+  const wrapper = document.createElement('div');
+  wrapper.classList.add('widget-large');
+  wrapper.style.minHeight = '150px';
+
+  wrapper.innerHTML = `
+    <div class="widget" draggable="true">
+      <div class="widget-header" contenteditable="true">Timeline - ${sessionId}</div>
+      <div class="timeline-controls">
+        <button id="zoomInBtn">Zoom In</button>
+        <button id="zoomOutBtn">Zoom Out</button>
+        <button id="zoomResetBtn">Reset</button>
+        <button id="toggleFocusBtn">Toggle Focus</button>
+      </div>
+      <div class="timeline-container" id="timelineContainer">
+        <div id="timeline"></div>
+        <div id="timelineLegend"></div>
+        <div id="timelineSummary"></div>
+      </div>
+    </div>
+  `;
+
+  grid.appendChild(wrapper);
+  loadTimeline(sessionId);
+}
+
+/* =========================
+   DRAG & DROP WIDGETS
+========================= */
+let dragged = null;
+
+document.addEventListener('dragstart', e => {
+  const w = e.target.closest('.widget');
+  if (w) { dragged = w; w.classList.add('dragging'); }
+});
+
+document.addEventListener('dragend', e => {
+  const w = e.target.closest('.widget');
+  if (w) { w.classList.remove('dragging'); dragged = null; }
+});
+
+document.addEventListener('dragover', e => {
+  e.preventDefault();
+  const target = e.target.closest('.widget');
+  if (!target || !dragged || target === dragged) return;
+  const children = [...grid.children];
+  const a = children.indexOf(dragged.parentElement);
+  const b = children.indexOf(target.parentElement);
+  if (a < b) grid.insertBefore(dragged.parentElement, target.parentElement.nextSibling);
+  else grid.insertBefore(dragged.parentElement, target.parentElement);
+});
+
 </script>
+
 <footer>© TICRA foundation</footer>
 </body>
 </html>
