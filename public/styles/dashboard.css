@@ -37,6 +37,7 @@
   border: 1px solid #ccc;
   border-radius: 8px;
   background: #fff;
+  overflow: hidden;
   position: relative;
   cursor: grab;
   overflow: hidden;
@@ -401,4 +402,55 @@ table th.total {
 .sessionTable tbody tr:hover td.sticky,
 table tbody tr:hover td.sticky {
   background:#fff8b0 !important;
+}
+
+.chartContainer,
+.timelineContainer {
+  width: 100%;
+  height: 100%;
+  overflow: auto;       /* scroll if content overflows */
+}
+  /* Slider styling */
+  .format-slider {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 4px 0;
+    margin-bottom: 8px;
+  }
+  .format-slider button {
+    padding: 4px 10px;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  .format-slider button.active {
+    background: #007bff;
+    color: #fff;
+    border-color: #007bff;
+  }
+
+  /* Chart wrapper */
+  .chartWrapper {
+    position: relative;
+    width: 100%;
+    height: 300px;
+  }
+
+  .chartCanvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+.timelineContainer {
+    width: auto;        /* do not force 100% */
+    max-width: 100%;    /* respect widget size */
+    overflow-x: auto;   /* scroll if content too wide */
+    overflow-y: hidden;
+}
+
+.widget {
+    width: auto;        /* let grid control width */
+    max-width: 100%;    /* do not exceed grid cell */
+    overflow: hidden;   /* hide anything outside widget */
 }

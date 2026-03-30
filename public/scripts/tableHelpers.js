@@ -48,7 +48,6 @@ export function downloadTableCSV(tableId = 'bigTable', filename = 'session_data.
 export function applyStickyColumns(table, numColumns = 0) {
     if (!table) return;
 
-    // FIX: fallback to parent if wrapper doesn't exist (widgets!)
     const wrapper = table.closest('#tableContainerWrapper') || table.parentElement;
 
     const thead = table.querySelector('thead');
@@ -112,9 +111,21 @@ export function applyStickyColumns(table, numColumns = 0) {
 export function sortTableByRow(table, row, sortStateObj, startCol=1, endColOverride=null, nonSortableCount=0) {
     const key = row.dataset.tab ?? row.dataset.operation;
 
-    if(!sortStateObj[key]) sortStateObj[key] = 0;
-    sortStateObj[key] = (sortStateObj[key] + 1) % 3;
+    // ✅ NEW LOGIC: detect new row vs same row
+    if (sortStateObj.lastKey !== key) {
+        // reset all states
+        Object.keys(sortStateObj).forEach(k => {
+            if (k !== 'lastKey') sortStateObj[k] = 0;
+        });
 
+        // start at descending
+        sortStateObj[key] = 1;
+    } else {
+        // cycle normally
+        sortStateObj[key] = (sortStateObj[key] + 1) % 3;
+    }
+
+    sortStateObj.lastKey = key;
     const state = sortStateObj[key];
 
     const tbody = table.querySelector("tbody");

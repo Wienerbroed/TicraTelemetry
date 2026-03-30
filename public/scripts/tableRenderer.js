@@ -16,7 +16,7 @@ export async function drawTable(perUser, STATE) {
   tbody.innerHTML = '';
 
   const headerRow = document.createElement('tr');
-  ['Operation', 'MOST USED', 'AVERAGE', 'TOTAL', ...STATE.userOrder].forEach((text, index) => {
+  ['Operation', 'MOST USED', 'AVG CLICKS BY EMP', 'TOTAL CLICKS', ...STATE.userOrder].forEach((text, index) => {
     const th = document.createElement('th'); 
     th.classList.add('rotate', 'sticky');
     if (index === 0) th.style.position = 'relative';
