@@ -12,7 +12,7 @@ export class Widget {
 
   initResizeControls() {
 
-    const widget = this.container.querySelector('.widget');
+    const widget = this.container.classList.contains('widget') ? this.container : this.container.querySelector('.widget');
     if (!widget) return;
 
     let colSpan =

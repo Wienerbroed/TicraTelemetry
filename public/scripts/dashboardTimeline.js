@@ -97,7 +97,7 @@ TimelineWidget.prototype._createHeader = function(wrapper) {
 TimelineWidget.prototype._createTimelineContainer = function(wrapper) {
     const timelineContainer = document.createElement('div');
     Object.assign(timelineContainer.style, {
-        width: '600px',
+        width: '1200px',
         overflowX: 'auto',
         position: 'relative',
         border: '1px solid #ccc',

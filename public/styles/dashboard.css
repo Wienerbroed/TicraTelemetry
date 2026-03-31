@@ -1,5 +1,5 @@
 /* =========================
-   GRID
+   GRID LAYOUT
 ========================= */
 
 #widgetGrid {
@@ -9,43 +9,34 @@
   padding: 16px;
 }
 
-/* =========================
-   GRID SPANS (WRAPPER)
-========================= */
+/* Grid spans */
+.widget-small { grid-column: span 1; }
+.widget-large { grid-column: span 2; }
+.widget-full  { grid-column: span 4; }
 
-.widget-small {
-  grid-column: span 1;
-}
-
-.widget-large {
-  grid-column: span 2;
-}
-
-.widget-full {
-  grid-column: span 4;
-}
 
 /* =========================
-   WIDGET
+   WIDGET BASE
 ========================= */
 
 .widget {
   height: 450px;
   width: 100%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   border: 1px solid #ccc;
   border-radius: 8px;
   background: #fff;
-  overflow: hidden;
   position: relative;
   cursor: grab;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .widget.dragging {
   opacity: 0.5;
 }
+
 
 /* =========================
    HEADER
@@ -59,18 +50,61 @@
   overflow: visible;
 }
 
+.widget-header[contenteditable="true"] {
+  border-bottom: 1px dashed #aaa;
+  cursor: text;
+}
+
+.widget-title {
+  font-weight: bold;
+  font-size: 16px;
+  outline: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.widget-title:focus {
+  background: #f0f0f0;
+  outline: 1px solid #aaa;
+}
+
+.widget-meta {
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.widget-summary {
+  font-size: 12px;
+  color: #333;
+  margin: 4px 0 8px;
+}
+
+
 /* =========================
-   CONTENT
+   CONTENT LAYOUT
 ========================= */
 
 .widget-content {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 8px;
+  overflow: hidden;
 }
+
+.chartContainer,
+.timelineContainer {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+
+/* =========================
+   TABLES (UNIFIED)
+========================= */
 
 .tableContainer {
   flex: 1;
@@ -83,37 +117,72 @@
   border-collapse: collapse;
   width: max-content;
   min-width: 100%;
+  font-size: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
 .tableContainer th,
 .tableContainer td {
   border: 1px solid #ddd;
-  padding: 4px;
-  white-space: nowrap;
+  padding: 6px 8px;
   text-align: center;
+  white-space: nowrap;
 }
 
-thead th {
+/* Sticky header */
+.tableContainer thead th {
   position: sticky;
   top: 0;
-  background: #fff;
-  z-index: 10;
+  background: #f8f8f8;
+  z-index: 3;
 }
 
+/* Sticky columns */
+.tableContainer td.sticky,
+.tableContainer th.sticky {
+  position: sticky;
+  background: #f5f5f5;
+  z-index: 2;
+}
+
+/* Hover highlight for sticky columns */
+.tableContainer tbody tr:hover td.sticky {
+  background: #fff8b0 !important;
+}
+
+/* Special columns: AVG / TOTAL */
+.tableContainer td.avg,
+.tableContainer th.avg,
+.tableContainer td.total,
+.tableContainer th.total {
+  background: #ddd;
+}
+
+/* Rotated headers (currently 0deg but can rotate later) */
+.tableContainer th.rotate > div {
+  transform: rotate(0deg);
+  transform-origin: bottom left;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 4px;
+}
+
+
 /* =========================
-   FILTERS
+   FILTERS & DROPDOWN
 ========================= */
 
+.filters,
 .filter-row {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
-  margin-top: 6px;
+  gap: 6px;
 }
 
-/* =========================
-   DROPDOWN
-========================= */
+.filter-row {
+  margin-top: 6px;
+}
 
 .dropdown {
   position: relative;
@@ -135,13 +204,13 @@ thead th {
   position: absolute;
   top: 100%;
   left: 0;
-  background: white;
-  border: 1px solid #ccc;
+  width: 100%;
   max-height: 200px;
   overflow: auto;
-  width: 100%;
-  z-index: 9999;
   padding: 6px;
+  background: #fff;
+  border: 1px solid #ccc;
+  z-index: 9999;
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
@@ -153,22 +222,57 @@ thead th {
   display: block;
   font-size: 13px;
 }
+
+
+/* =========================
+   CHARTS
+========================= */
+
 .chartContainer {
-  width: 100%;
-  height: 100%;
+  display: flex;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  display: flex;
 }
 
-.chartContainer canvas {
+.chartContainer canvas,
+.chartCanvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
 }
 
-/* SLIDER STYLE */
+.chartWrapper {
+  position: relative;
+  width: 100%;
+  height: 300px;
+}
+
+
+/* =========================
+   TIMELINE
+========================= */
+
+.timelineContainer {
+  height: 300px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+#timeline {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 100%;
+  position: relative;
+}
+
+
+/* =========================
+   SLIDERS & CONTROLS
+========================= */
+
 .chartControls {
   display: flex;
   align-items: center;
@@ -178,53 +282,11 @@ thead th {
 
 .sliderTrack {
   width: 60px;
-  height: 10px;
-  background: #ccc;
-  border-radius: 5px;
-  position: relative;
-  cursor: pointer;
-}
-
-.sliderKnob {
-  width: 14px;
-  height: 14px;
-  background: #4caf50;
-  border-radius: 50%;
-  position: absolute;
-  top: -2px;
-  left: 0px;
-  transition: left 0.2s ease;
-}
-
-/* TITLE + META */
-.widget-title {
-  font-weight: bold;
-  font-size: 16px;
-  outline: none;
-  padding: 4px 6px;
-  border-radius: 4px;
-}
-
-.widget-title:focus {
-  background: #f0f0f0;
-  outline: 1px solid #aaa;
-}
-
-.widget-meta {
-  font-size: 12px;
-  color: #666;
-  margin-top: 2px;
-}
-
-.sliderTrack {
-  width: 60px;
   height: 20px;
   background: #ddd;
   border-radius: 10px;
   position: relative;
   cursor: pointer;
-  display: inline-block;
-  margin: 0 8px;
 }
 
 .sliderKnob {
@@ -234,49 +296,33 @@ thead th {
   border-radius: 50%;
   position: absolute;
   top: 0;
+  left: 0;
   transition: left 0.2s;
 }
 
-
-/* =========================
-   GRID
-========================= */
-
-#widgetGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  padding: 16px;
-}
-
-/* =========================
-   GRID SPANS
-========================= */
-
-.widget-small { grid-column: span 1; }
-.widget-large { grid-column: span 2; }
-.widget-full { grid-column: span 4; }
-
-/* =========================
-   WIDGET
-========================= */
-
-.widget {
-  height: 450px;
-  width: 100%;
+/* Format toggle buttons */
+.format-slider {
   display: flex;
-  flex-direction: column;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  background: #fff;
-  position: relative;
-  cursor: grab;
-  overflow: visible;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 0;
+  margin-bottom: 8px;
 }
 
-.widget.dragging {
-  opacity: 0.5;
+.format-slider button {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  background: #f0f0f0;
+  cursor: pointer;
+  border-radius: 4px;
 }
+
+.format-slider button.active {
+  background: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
 
 /* =========================
    RESIZE CONTROLS
@@ -285,7 +331,7 @@ thead th {
 .resize-controls-right {
   position: absolute;
   top: 50%;
-  right: -10px; /* pull outside the widget */
+  right: -10px;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
@@ -294,7 +340,7 @@ thead th {
 
 .resize-controls-bottom {
   position: absolute;
-  bottom: -10px; /* pull outside the widget */
+  bottom: -10px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -306,7 +352,7 @@ thead th {
   width: 20px;
   height: 20px;
   border: 1px solid #ccc;
-  background: white;
+  background: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -314,143 +360,8 @@ thead th {
   font-size: 14px;
 }
 
-/* Optional: slightly better visibility */
 .resize-controls-right button:hover,
 .resize-controls-bottom button:hover {
   background: #eee;
 }
 
-/* FILTERS */
-.filters {
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-bottom:10px;
-}
-
-/* SESSION TABLE */
-.sessionTable, table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 12px;
-}
-
-.sessionTable th,
-.sessionTable td,
-table th,
-table td {
-  padding:4px 6px;
-  border:1px solid #ddd;
-  text-align:center;
-}
-
-/* HEADER ROW STICKY */
-.sessionTable thead th,
-table thead th {
-  position: sticky;
-  top:0;
-  background:#f5f5f5;
-  z-index:3;
-}
-
-/* ROTATED HEADER */
-.sessionTable th.rotate > div,
-table th.rotate > div {
-  transform: rotate(-0deg);
-  transform-origin: bottom left;
-  white-space: nowrap;
-  font-size:11px;
-  padding:4px;
-}
-
-/* EDITABLE TITLE */
-.widget-header[contenteditable="true"] {
-  border-bottom:1px dashed #aaa;
-  cursor:text;
-}
-
-/* SUMMARY UNDER TITLE */
-.widget-summary {
-  font-size:12px;
-  color:#333;
-  margin:4px 0 8px 0;
-}
-
-/* STICKY FIRST 3 COLUMNS */
-.sessionTable td.sticky,
-.sessionTable th.sticky,
-table td.sticky,
-table th.sticky {
-  position: sticky;
-  background: #f5f5f5;
-  z-index:2;
-}
-
-/* AVG / TOTAL COLUMN COLORS */
-.sessionTable td.avg,
-.sessionTable th.avg,
-.sessionTable td.total,
-.sessionTable th.total,
-table td.avg,
-table th.avg,
-table td.total,
-table th.total {
-  background:#ddd;
-}
-
-/* HOVER ONLY ON FIRST 3 COLUMNS */
-.sessionTable tbody tr:hover td.sticky,
-table tbody tr:hover td.sticky {
-  background:#fff8b0 !important;
-}
-
-.chartContainer,
-.timelineContainer {
-  width: 100%;
-  height: 100%;
-  overflow: auto;       /* scroll if content overflows */
-}
-  /* Slider styling */
-  .format-slider {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 4px 0;
-    margin-bottom: 8px;
-  }
-  .format-slider button {
-    padding: 4px 10px;
-    border: 1px solid #ccc;
-    background: #f0f0f0;
-    cursor: pointer;
-    border-radius: 4px;
-  }
-  .format-slider button.active {
-    background: #007bff;
-    color: #fff;
-    border-color: #007bff;
-  }
-
-  /* Chart wrapper */
-  .chartWrapper {
-    position: relative;
-    width: 100%;
-    height: 300px;
-  }
-
-  .chartCanvas {
-    width: 100% !important;
-    height: 100% !important;
-  }
-.timelineContainer {
-    width: auto;        /* do not force 100% */
-    max-width: 100%;    /* respect widget size */
-    overflow-x: auto;   /* scroll if content too wide */
-    overflow-y: hidden;
-}
-
-.widget {
-    width: auto;        /* let grid control width */
-    max-width: 100%;    /* do not exceed grid cell */
-    overflow: hidden;   /* hide anything outside widget */
-}

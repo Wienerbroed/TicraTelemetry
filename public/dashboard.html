@@ -10,22 +10,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-.timelineContainer {
-  width: 100%;
-  height: 300px;      /* widget height or relative */
-  overflow-x: auto;   /* horizontal scroll */
-  overflow-y: hidden; /* no vertical scroll inside timeline */
-  position: relative;
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-}
 
-#timeline {
-  display: flex;
-  flex-wrap: nowrap;   /* keep events in a row */
-  min-width: 100%;     /* at least fill the widget */
-  position: relative;
-}
 </style>
 </head>
 <body>
@@ -96,7 +81,7 @@ document.getElementById('addSessionChartWidgetBtn').onclick = () => {
 
 document.getElementById('addTimelineWidgetBtn').onclick = () => {
   const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-small');
+  wrapper.classList.add('widget-large');
   grid.appendChild(wrapper);
   new TimelineWidget(wrapper);
 };
@@ -129,6 +114,6 @@ document.addEventListener('dragover', e => {
 
 </script>
 
-<footer>© TICRA foundation</footer>
+
 </body>
 </html>

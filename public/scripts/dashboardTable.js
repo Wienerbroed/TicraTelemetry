@@ -2,6 +2,9 @@ import { Widget } from './widgets.js';
 import { fetchJson } from './utils.js';
 import { drawTable } from './tableRenderer.js';
 
+/* =========================
+   TABLE WIDGET
+========================= */
 export class TableWidget extends Widget {
 
   constructor(wrapper) {
@@ -47,7 +50,7 @@ export class TableWidget extends Widget {
         </div>
 
         <div class="widget-content">
-          <div class="tableContainer">
+          <div class="tableContainer" style="overflow:auto; max-height:auto;">
             <table>
               <thead></thead>
               <tbody></tbody>
@@ -129,6 +132,8 @@ export class TableWidget extends Widget {
       rowSortStates: {},
       tableElement: this.container.querySelector('table')
     });
+
+    setStickyColumns(this.container.querySelector('table'));
   }
 
   initDropdowns() {
@@ -295,7 +300,7 @@ function heatColor(val, max) {
   return `hsl(120,70%,${100 - i * 60}%)`;
 }
 
-function setStickyColumns(table) {
+export function setStickyColumns(table) {
   const stickyIndexes = [0, 1, 2];
   const colWidths = [];
   const headerRow = table.querySelector('thead tr');
@@ -327,95 +332,186 @@ export class SessionTableWidget extends Widget {
     super(wrapper);
     this.wrapper = wrapper;
 
+    const now = new Date();
+    const past = new Date();
+    past.setDate(now.getDate() - 10);
+    const format = d => d.toISOString().split('T')[0];
+
+    // Widget HTML
     this.wrapper.innerHTML = `
       <div class="widget" draggable="true">
-        <div class="widget-header" contenteditable="true">Session Table</div>
-        <div class="widget-summary"></div>
-        <div class="widget-body">
-          <div class="filters">
-            <input type="datetime-local" class="startTime">
-            <input type="datetime-local" class="endTime">
-            <select class="eventType"><option value="">Event Type</option></select>
-            <select class="employee"><option value="">All</option></select>
-            <button class="applyBtn">Apply</button>
+        <div class="widget-header">
+          <div class="widget-title" contenteditable="true">Session Table</div>
+          <div class="widget-summary"></div>
+
+          <label>Start:
+            <input type="date" class="startDate" value="${format(past)}">
+          </label>
+
+          <label>End:
+            <input type="date" class="endDate" value="${format(now)}">
+          </label>
+
+          <div class="filter-row">
+            <div class="dropdown">
+              <button class="dropdown-btn">Event Types ▼</button>
+              <div class="dropdown-content eventTypeGroup"></div>
+            </div>
+
+            <div class="dropdown">
+              <button class="dropdown-btn">Employee Types ▼</button>
+              <div class="dropdown-content employeeTypeGroup"></div>
+            </div>
           </div>
-          <div style="overflow:auto; max-height:400px;">
-            <table><thead></thead><tbody></tbody></table>
+
+          <button class="applyBtn">Apply</button>
+        </div>
+
+        <div class="widget-content">
+          <div class="tableContainer" style="overflow:auto; max-height:auto;">
+            <table>
+              <thead></thead>
+              <tbody></tbody>
+            </table>
           </div>
+        </div>
+
+        <!-- RESIZE CONTROLS -->
+        <div class="resize-controls-right">
+          <button class="resize-plus-x">+</button>
+          <button class="resize-minus-x">−</button>
+        </div>
+
+        <div class="resize-controls-bottom">
+          <button class="resize-plus-y">+</button>
+          <button class="resize-minus-y">−</button>
         </div>
       </div>
     `;
 
     this.cache();
-    this.setDefaults();
-    this.loadDropdowns();
+    this.loadFilters();
+    this.initDropdowns();
+    this.initResizeControls(); // width + height now work
     this.bind();
   }
 
   cache() {
-    this.start = this.wrapper.querySelector('.startTime');
-    this.end = this.wrapper.querySelector('.endTime');
-    this.eventType = this.wrapper.querySelector('.eventType');
-    this.employee = this.wrapper.querySelector('.employee');
-    this.applyBtn = this.wrapper.querySelector('.applyBtn');
-    this.table = this.wrapper.querySelector('table');
-    this.header = this.wrapper.querySelector('.widget-header');
-    this.summary = this.wrapper.querySelector('.widget-summary');
+    // Fix: outer wrapper is container, inner .widget is the actual widget element
+    this.container = this.wrapper; // container for resize controls
+    this.innerWidget = this.wrapper.querySelector('.widget'); // actual widget
+
+    this.start = this.innerWidget.querySelector('.startDate');
+    this.end = this.innerWidget.querySelector('.endDate');
+    this.eventTypeGroup = this.innerWidget.querySelector('.eventTypeGroup');
+    this.employeeTypeGroup = this.innerWidget.querySelector('.employeeTypeGroup');
+    this.applyBtn = this.innerWidget.querySelector('.applyBtn');
+    this.tableContainer = this.innerWidget.querySelector('.tableContainer');
+    this.table = this.tableContainer.querySelector('table');
+    this.title = this.innerWidget.querySelector('.widget-title');
+    this.summary = this.innerWidget.querySelector('.widget-summary');
   }
 
-  setDefaults() {
-    const now = new Date();
-    const past = new Date(); past.setDate(now.getDate() - 10);
-    const f = d => d.toISOString().slice(0,16);
-    this.start.value = f(past);
-    this.end.value = f(now);
-  }
-
-  async loadDropdowns() {
+  async loadFilters() {
     const eventTypes = await fetchJson('/sessionTypes');
     eventTypes.forEach(e => {
-      const o = document.createElement('option'); o.value = e; o.textContent = e;
-      this.eventType.appendChild(o);
+      const label = document.createElement('label');
+      label.innerHTML = `<input type="checkbox" value="${e}"> ${e}`;
+      this.eventTypeGroup.appendChild(label);
     });
 
     const employeeTypes = await fetchJson('/employeeTypes');
     const users = await fetchJson('/users');
 
     if (employeeTypes.length) {
-      const g = document.createElement('optgroup'); g.label = "Employee Types";
+      const groupLabel = document.createElement('div'); 
+      groupLabel.textContent = "Employee Types:";
+      this.employeeTypeGroup.appendChild(groupLabel);
+
       employeeTypes.forEach(t => {
-        const o = document.createElement('option'); o.value = t; o.textContent = t; o.dataset.type = "type";
-        g.appendChild(o);
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" value="${t}"> ${t}`;
+        label.dataset.type = "type";
+        this.employeeTypeGroup.appendChild(label);
       });
-      this.employee.appendChild(g);
     }
 
     if (users.length) {
-      const g = document.createElement('optgroup'); g.label = "Employees";
+      const groupLabel = document.createElement('div'); 
+      groupLabel.textContent = "Employees:";
+      this.employeeTypeGroup.appendChild(groupLabel);
+
       users.forEach(u => {
-        const o = document.createElement('option'); o.value = u; o.textContent = u; o.dataset.type = "user";
-        g.appendChild(o);
+        const label = document.createElement('label');
+        label.innerHTML = `<input type="checkbox" value="${u}"> ${u}`;
+        label.dataset.type = "user";
+        this.employeeTypeGroup.appendChild(label);
       });
-      this.employee.appendChild(g);
     }
   }
 
-  bind() {
-    this.applyBtn.onclick = async () => {
-      const empOpt = this.employee.value ? this.employee.selectedOptions[0] : null;
-      const employeeData = empOpt ? { value: empOpt.value, type: empOpt.dataset.type } : null;
-
-      const startTime = this.start.value.replace("T"," ");
-      const endTime = this.end.value.replace("T"," ");
-      const empText = employeeData?.value || "All";
-      this.summary.textContent = `${this.eventType.value} - ${empText} - ${startTime} -> ${endTime}`;
-
-      await buildSessionTable(this.wrapper, {
-        start: this.start.value,
-        end: this.end.value,
-        eventType: this.eventType.value,
-        employee: employeeData
+  initDropdowns() {
+    this.innerWidget.querySelectorAll('.dropdown').forEach(drop => {
+      const btn = drop.querySelector('.dropdown-btn');
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        document.querySelectorAll('.dropdown').forEach(d => {
+          if (d !== drop) d.classList.remove('open');
+        });
+        drop.classList.toggle('open');
       });
-    };
+      drop.addEventListener('click', e => e.stopPropagation());
+    });
+
+    document.addEventListener('click', () => {
+      this.innerWidget.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+    });
+  }
+
+  getChecked(container) {
+    return [...container.querySelectorAll('input[type="checkbox"]:checked')].map(c => ({
+      value: c.value,
+      type: c.dataset.type || null
+    }));
+  }
+
+  bind() {
+    this.applyBtn.addEventListener('click', async () => {
+      const selectedEvents = this.getChecked(this.eventTypeGroup);
+      const selectedEmployees = this.getChecked(this.employeeTypeGroup);
+
+      if (!selectedEvents.length) return;
+
+      const startDate = this.start.value;
+      const endDate = this.end.value;
+
+      this.summary.textContent = `${selectedEvents.map(e => e.value).join(', ')} - ${selectedEmployees.map(e => e.value).join(', ') || 'All'} - ${startDate} -> ${endDate}`;
+
+      const sessions = [];
+
+      for (const event of selectedEvents) {
+        const params = new URLSearchParams();
+        params.append('configTitle', event.value);
+        params.append('startTime', startDate);
+        params.append('endTime', endDate);
+
+        selectedEmployees.forEach(emp => {
+          if (emp.type === "type") params.append('employee_type', emp.value);
+          else if (emp.type === "user") params.append('user_name', emp.value);
+        });
+
+        const data = await fetchJson(`/session?${params}`);
+        sessions.push(...(data.sessions || []));
+      }
+
+      buildSessionTable(this.wrapper, {
+        start: startDate,
+        end: endDate,
+        eventType: selectedEvents.map(e => e.value).join(', '),
+        employee: selectedEmployees.length ? selectedEmployees[0] : null
+      });
+
+      setStickyColumns(this.table);
+    });
   }
 }

@@ -32,6 +32,20 @@ export function renderSessionCharts(
     const modes = ['percent', 'seconds', 'hms'];
     const modeLabels = { percent: '%', seconds: 'Sec', hms: 'HH' };
 
+    // --- Global sync state ---
+    let globalModeIndex = 0;
+    const allSliders = [];
+    const chartRenderers = [];
+
+    function syncAll(index) {
+        if (index === globalModeIndex) return;
+
+        globalModeIndex = index;
+
+        allSliders.forEach(sl => sl.setIndex(index));
+        chartRenderers.forEach(fn => fn());
+    }
+
     columns.forEach(col => {
         const chartWrapper = document.createElement('div');
         chartWrapper.style.border = '1px solid #ddd';
@@ -51,13 +65,14 @@ export function renderSessionCharts(
         const sliderContainer = document.createElement('div');
         chartWrapper.appendChild(sliderContainer);
 
-        // Create generalized slider
-        const getCurrentModeIndex = createSlider(
+        // Create generalized slider with global sync
+        const sliderControl = createSlider(
             sliderContainer,
             [modeLabels.percent, modeLabels.seconds, modeLabels.hms],
             125,
-            renderChart // callback on change
+            (index) => syncAll(index)
         );
+        allSliders.push(sliderControl);
 
         // --- CANVAS ---
         const canvas = document.createElement('canvas');
@@ -68,7 +83,7 @@ export function renderSessionCharts(
 
         // --- RENDER CHART FUNCTION ---
         function renderChart() {
-            const currentModeIndex = getCurrentModeIndex();
+            const currentModeIndex = globalModeIndex;
             const mode = modes[currentModeIndex];
 
             const rawData = tabs.map(tab => {
@@ -139,7 +154,9 @@ export function renderSessionCharts(
             });
         }
 
-        // Initial render
-        renderChart();
+        chartRenderers.push(renderChart);
     });
+
+    // --- INITIAL RENDER FOR ALL CHARTS ---
+    chartRenderers.forEach(fn => fn());
 }

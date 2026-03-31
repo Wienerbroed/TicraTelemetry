@@ -288,7 +288,7 @@ const sessionFetchByQueries = async ({
   if (user_name) matchFilter.user_name = user_name;
   if (employee_type) matchFilter.employee_type = employee_type;
 
-  matchFilter.event_type = { $in: ["Tabpage", "Focus"] };
+  matchFilter.event_type = { $in: ["Tabpage", "Focus", "GraspGUI End"] };
 
   const projection = {
     user_name: 1,
