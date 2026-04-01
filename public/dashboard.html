@@ -27,11 +27,7 @@
 <h1 style="padding:16px;">Event Pool Viewer</h1>
 
 <div style="padding:16px;">
-  <button id="addTableWidgetBtn">+ Add Table Widget</button>
-  <button id="addChartWidgetBtn">+ Add Chart Widget</button>
-  <button id="addSessionWidgetBtn">+ Add Session Table</button>
-  <button id="addSessionChartWidgetBtn">+ Add Session Chart</button>
-  <button id="addTimelineWidgetBtn">+ Add Timeline Widget</button>
+  <button id="addWidgetBtn">+ Add Widget</button>
 </div>
 
 <div id="widgetGrid"></div>
@@ -42,53 +38,74 @@ import { TableWidget } from './scripts/dashboardTable.js';
 import { ChartWidget } from './scripts/dashboardChart.js';
 import { SessionTableWidget } from './scripts/dashboardTable.js';
 import { SessionChartWidget } from './scripts/dashboardChart.js';
+import { TimelineWidget } from './scripts/dashboardTimeline.js';
 import { fetchJson } from './scripts/utils.js';
 import { Widget } from './scripts/widgets.js';
-import { TimelineWidget } from './scripts/dashboardTimeline.js';
 
-/* =========================
-   WIDGET ADD BUTTONS
-========================= */
 const grid = document.getElementById('widgetGrid');
 
-document.getElementById('addTableWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-large');
-  grid.appendChild(wrapper);
-  new TableWidget(wrapper);
-};
-
-document.getElementById('addChartWidgetBtn').onclick = () => {
+/* =========================
+   ADD PLACEHOLDER WIDGET
+========================= */
+document.getElementById('addWidgetBtn').onclick = () => {
   const wrapper = document.createElement('div');
   wrapper.classList.add('widget-small');
-  grid.appendChild(wrapper);
-  new ChartWidget(wrapper);
-};
 
-document.getElementById('addSessionWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-large');
-  grid.appendChild(wrapper);
-  new SessionTableWidget(wrapper);
-};
+  // Placeholder Widget
+  const placeholder = document.createElement('div');
+  placeholder.classList.add('widget', 'placeholder-widget');
+  placeholder.draggable = true;
 
-document.getElementById('addSessionChartWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-small');
-  grid.appendChild(wrapper);
-  new SessionChartWidget(wrapper);
-};
+  const placeholderText = document.createElement('div');
+  placeholderText.classList.add('widget-placeholder-text');
+  placeholderText.textContent = 'Click to select widget';
+  placeholder.appendChild(placeholderText);
 
-document.getElementById('addTimelineWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-large');
+  // Widget choice menu
+  const menu = document.createElement('div');
+  menu.classList.add('widget-placeholder-menu');
+
+  const widgetOptions = [
+    { name: 'Table', cls: TableWidget, size: 'widget-small' },
+    { name: 'Chart', cls: ChartWidget, size: 'widget-small' },
+    { name: 'Session Table', cls: SessionTableWidget, size: 'widget-small' },
+    { name: 'Session Chart', cls: SessionChartWidget, size: 'widget-small' },
+    { name: 'Timeline', cls: TimelineWidget, size: 'widget-large' },
+  ];
+
+  widgetOptions.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.textContent = opt.name;
+    btn.onclick = e => {
+      e.stopPropagation();
+      wrapper.innerHTML = '';
+      wrapper.className = opt.size;
+      new opt.cls(wrapper);
+    };
+    menu.appendChild(btn);
+  });
+
+  placeholder.appendChild(menu);
+
+  // Show menu on click
+  placeholder.addEventListener('click', e => {
+    e.stopPropagation();
+    menu.style.display = 'block';
+  });
+
+  // Hide menu when clicking outside
+  document.addEventListener('click', () => {
+    menu.style.display = 'none';
+  });
+
+  wrapper.appendChild(placeholder);
   grid.appendChild(wrapper);
-  new TimelineWidget(wrapper);
 };
 
 /* =========================
    DRAG & DROP WIDGETS
 ========================= */
+
 let dragged = null;
 
 document.addEventListener('dragstart', e => {

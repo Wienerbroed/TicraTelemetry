@@ -392,12 +392,11 @@ export class SessionTableWidget extends Widget {
     this.cache();
     this.loadFilters();
     this.initDropdowns();
-    this.initResizeControls(); // width + height now work
+    this.initResizeControls();
     this.bind();
   }
 
   cache() {
-    // Fix: outer wrapper is container, inner .widget is the actual widget element
     this.container = this.wrapper; // container for resize controls
     this.innerWidget = this.wrapper.querySelector('.widget'); // actual widget
 
@@ -414,39 +413,46 @@ export class SessionTableWidget extends Widget {
 
   async loadFilters() {
     const eventTypes = await fetchJson('/sessionTypes');
-    eventTypes.forEach(e => {
-      const label = document.createElement('label');
-      label.innerHTML = `<input type="checkbox" value="${e}"> ${e}`;
-      this.eventTypeGroup.appendChild(label);
-    });
-
     const employeeTypes = await fetchJson('/employeeTypes');
     const users = await fetchJson('/users');
 
+    // Helper: create single-select checkbox in a container
+    const createSingleSelectCheckbox = (container, value, type = null) => {
+      const label = document.createElement('label');
+      label.innerHTML = `<input type="checkbox" value="${value}"> ${value}`;
+      if (type) label.querySelector('input').dataset.type = type;
+
+      const checkbox = label.querySelector('input');
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            if (cb !== checkbox) cb.checked = false;
+          });
+        }
+      });
+
+      container.appendChild(label);
+    };
+
+    // Event Types (single-select)
+    eventTypes.forEach(e => createSingleSelectCheckbox(this.eventTypeGroup, e));
+
+    // Employee Types (single-select)
     if (employeeTypes.length) {
       const groupLabel = document.createElement('div'); 
       groupLabel.textContent = "Employee Types:";
       this.employeeTypeGroup.appendChild(groupLabel);
 
-      employeeTypes.forEach(t => {
-        const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" value="${t}"> ${t}`;
-        label.dataset.type = "type";
-        this.employeeTypeGroup.appendChild(label);
-      });
+      employeeTypes.forEach(t => createSingleSelectCheckbox(this.employeeTypeGroup, t, "type"));
     }
 
+    // Users (single-select)
     if (users.length) {
       const groupLabel = document.createElement('div'); 
       groupLabel.textContent = "Employees:";
       this.employeeTypeGroup.appendChild(groupLabel);
 
-      users.forEach(u => {
-        const label = document.createElement('label');
-        label.innerHTML = `<input type="checkbox" value="${u}"> ${u}`;
-        label.dataset.type = "user";
-        this.employeeTypeGroup.appendChild(label);
-      });
+      users.forEach(u => createSingleSelectCheckbox(this.employeeTypeGroup, u, "user"));
     }
   }
 
@@ -487,31 +493,60 @@ export class SessionTableWidget extends Widget {
 
       this.summary.textContent = `${selectedEvents.map(e => e.value).join(', ')} - ${selectedEmployees.map(e => e.value).join(', ') || 'All'} - ${startDate} -> ${endDate}`;
 
-      const sessions = [];
-
-      for (const event of selectedEvents) {
-        const params = new URLSearchParams();
-        params.append('configTitle', event.value);
-        params.append('startTime', startDate);
-        params.append('endTime', endDate);
-
-        selectedEmployees.forEach(emp => {
-          if (emp.type === "type") params.append('employee_type', emp.value);
-          else if (emp.type === "user") params.append('user_name', emp.value);
-        });
-
-        const data = await fetchJson(`/session?${params}`);
-        sessions.push(...(data.sessions || []));
-      }
-
-      buildSessionTable(this.wrapper, {
+      // Build session table for first selected employee (single-select)
+      await buildSessionTable(this.wrapper, {
         start: startDate,
         end: endDate,
-        eventType: selectedEvents.map(e => e.value).join(', '),
+        eventType: selectedEvents[0].value,
         employee: selectedEmployees.length ? selectedEmployees[0] : null
       });
 
       setStickyColumns(this.table);
+
+      // Add clickable links for session IDs
+      this.addSessionLinks();
     });
+  }
+
+  addSessionLinks() {
+    const tbody = this.table.querySelector('tbody');
+    if (!tbody) return;
+
+    [...tbody.querySelectorAll('tr')].forEach(row => {
+      const sessionCell = row.querySelector('td.sessionId');
+      if (sessionCell && !sessionCell.querySelector('a')) {
+        const sessionId = sessionCell.textContent.trim();
+        const link = document.createElement('a');
+        link.href = "#";
+        link.textContent = sessionId;
+        link.addEventListener('click', e => {
+          e.preventDefault();
+          this.createTimelineWidget(sessionId);
+        });
+        sessionCell.textContent = "";
+        sessionCell.appendChild(link);
+      }
+    });
+  }
+
+  createTimelineWidget(sessionId) {
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('widget-large');
+    this.wrapper.parentElement.appendChild(wrapper);
+
+    // Create a simple inline timeline widget inside this wrapper
+    wrapper.innerHTML = `
+      <div class="widget" draggable="true">
+        <div class="widget-header">
+          <div class="widget-title">Timeline: ${sessionId}</div>
+        </div>
+        <div class="widget-content">
+          <div class="timelineContainer">
+            <!-- Timeline content based on session ID will go here -->
+            <p>Loading timeline for session ${sessionId}...</p>
+          </div>
+        </div>
+      </div>
+    `;
   }
 }

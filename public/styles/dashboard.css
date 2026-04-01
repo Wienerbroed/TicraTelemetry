@@ -1,7 +1,6 @@
 /* =========================
-   GRID LAYOUT
+   GRID
 ========================= */
-
 #widgetGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -9,20 +8,34 @@
   padding: 16px;
 }
 
-/* Grid spans */
-.widget-small { grid-column: span 1; }
-.widget-large { grid-column: span 2; }
-.widget-full  { grid-column: span 4; }
+/* =========================
+   GRID SPANS / WIDGET WIDTH
+========================= */
+.widget-small { 
+  grid-column: span 1;
+  width: 600px;       /* initial width for 1 column */
+}
 
+.widget-large { 
+  grid-column: span 2;
+  width: 1200px;       /* initial width for 2 columns */
+}
+
+.widget-extra { 
+  grid-column: span 2;
+  width: 1800px;       /* initial width for 2 columns */
+}
+
+.widget-full { 
+  grid-column: span 4;
+  width: 100%;        /* full width spans all columns */
+}
 
 /* =========================
    WIDGET BASE
 ========================= */
-
 .widget {
   height: 450px;
-  width: 100%;
-  max-width: 100%;
   display: flex;
   flex-direction: column;
   border: 1px solid #ccc;
@@ -30,18 +43,23 @@
   background: #fff;
   position: relative;
   cursor: grab;
-  overflow: visible;
+  overflow: hidden;      /* prevents content from expanding widget */
+  
+  min-width: 0;           /* allow content to shrink */
+  max-width: none;        /* prevent content from overriding width */
+}
+
+.widget > * {
+  min-width: 0;
 }
 
 .widget.dragging {
   opacity: 0.5;
 }
 
-
 /* =========================
    HEADER
 ========================= */
-
 .widget-header {
   flex-shrink: 0;
   padding: 8px;
@@ -77,34 +95,20 @@
 .widget-summary {
   font-size: 12px;
   color: #333;
-  margin: 4px 0 8px;
+  margin: 4px 0 8px 0;
 }
 
-
 /* =========================
-   CONTENT LAYOUT
+   WIDGET CONTENT
 ========================= */
-
 .widget-content {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: 8px;
-  overflow: hidden;
 }
-
-.chartContainer,
-.timelineContainer {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-}
-
-
-/* =========================
-   TABLES (UNIFIED)
-========================= */
 
 .tableContainer {
   flex: 1;
@@ -117,73 +121,43 @@
   border-collapse: collapse;
   width: max-content;
   min-width: 100%;
-  font-size: 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
 }
 
 .tableContainer th,
 .tableContainer td {
   border: 1px solid #ddd;
-  padding: 6px 8px;
-  text-align: center;
+  padding: 4px;
   white-space: nowrap;
+  text-align: center;
 }
 
-/* Sticky header */
-.tableContainer thead th {
+thead th {
   position: sticky;
   top: 0;
-  background: #f8f8f8;
-  z-index: 3;
+  background: #fff;
+  z-index: 10;
 }
-
-/* Sticky columns */
-.tableContainer td.sticky,
-.tableContainer th.sticky {
-  position: sticky;
-  background: #f5f5f5;
-  z-index: 2;
-}
-
-/* Hover highlight for sticky columns */
-.tableContainer tbody tr:hover td.sticky {
-  background: #fff8b0 !important;
-}
-
-/* Special columns: AVG / TOTAL */
-.tableContainer td.avg,
-.tableContainer th.avg,
-.tableContainer td.total,
-.tableContainer th.total {
-  background: #ddd;
-}
-
-/* Rotated headers (currently 0deg but can rotate later) */
-.tableContainer th.rotate > div {
-  transform: rotate(0deg);
-  transform-origin: bottom left;
-  white-space: nowrap;
-  font-size: 11px;
-  padding: 4px;
-}
-
 
 /* =========================
-   FILTERS & DROPDOWN
+   FILTERS
 ========================= */
-
-.filters,
-.filter-row {
+.filters {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 10px;
 }
 
 .filter-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 6px;
 }
 
+/* =========================
+   DROPDOWN
+========================= */
 .dropdown {
   position: relative;
   flex: 1;
@@ -204,13 +178,13 @@
   position: absolute;
   top: 100%;
   left: 0;
-  width: 100%;
+  background: white;
+  border: 1px solid #ccc;
   max-height: 200px;
   overflow: auto;
-  padding: 6px;
-  background: #fff;
-  border: 1px solid #ccc;
+  width: 100%;
   z-index: 9999;
+  padding: 6px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
@@ -223,56 +197,27 @@
   font-size: 13px;
 }
 
-
 /* =========================
    CHARTS
 ========================= */
-
 .chartContainer {
-  display: flex;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  display: flex;
 }
 
-.chartContainer canvas,
-.chartCanvas {
+.chartContainer canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
 }
 
-.chartWrapper {
-  position: relative;
-  width: 100%;
-  height: 300px;
-}
-
-
 /* =========================
-   TIMELINE
+   SLIDERS
 ========================= */
-
-.timelineContainer {
-  height: 300px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  position: relative;
-  border: 1px solid #ccc;
-  box-sizing: border-box;
-}
-
-#timeline {
-  display: flex;
-  flex-wrap: nowrap;
-  min-width: 100%;
-  position: relative;
-}
-
-
-/* =========================
-   SLIDERS & CONTROLS
-========================= */
-
 .chartControls {
   display: flex;
   align-items: center;
@@ -287,6 +232,8 @@
   border-radius: 10px;
   position: relative;
   cursor: pointer;
+  display: inline-block;
+  margin: 0 8px;
 }
 
 .sliderKnob {
@@ -296,38 +243,12 @@
   border-radius: 50%;
   position: absolute;
   top: 0;
-  left: 0;
   transition: left 0.2s;
 }
-
-/* Format toggle buttons */
-.format-slider {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  padding: 4px 0;
-  margin-bottom: 8px;
-}
-
-.format-slider button {
-  padding: 4px 10px;
-  border: 1px solid #ccc;
-  background: #f0f0f0;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.format-slider button.active {
-  background: #007bff;
-  color: #fff;
-  border-color: #007bff;
-}
-
 
 /* =========================
    RESIZE CONTROLS
 ========================= */
-
 .resize-controls-right {
   position: absolute;
   top: 50%;
@@ -352,7 +273,7 @@
   width: 20px;
   height: 20px;
   border: 1px solid #ccc;
-  background: #fff;
+  background: white;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -365,3 +286,62 @@
   background: #eee;
 }
 
+/* =========================
+   SESSION TABLE & STICKY COLUMNS
+========================= */
+.sessionTable, table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.sessionTable th,
+.sessionTable td,
+table th,
+table td {
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+.sessionTable thead th,
+table thead th {
+  position: sticky;
+  top: 0;
+  background: #f5f5f5;
+  z-index: 3;
+}
+
+.sessionTable th.rotate > div,
+table th.rotate > div {
+  transform: rotate(-0deg);
+  transform-origin: bottom left;
+  white-space: nowrap;
+  font-size: 11px;
+  padding: 4px;
+}
+
+.sessionTable td.sticky,
+.sessionTable th.sticky,
+table td.sticky,
+table th.sticky {
+  position: sticky;
+  background: #f5f5f5;
+  z-index: 2;
+}
+
+.sessionTable td.avg,
+.sessionTable th.avg,
+.sessionTable td.total,
+.sessionTable th.total,
+table td.avg,
+table th.avg,
+table td.total,
+table th.total {
+  background: #ddd;
+}
+
+.sessionTable tbody tr:hover td.sticky,
+table tbody tr:hover td.sticky {
+  background: #fff8b0 !important;
+}

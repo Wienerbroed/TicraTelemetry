@@ -28,11 +28,11 @@ export class Widget {
     const MAX_ROW = 5;
 
     const applyCol = () => {
-      this.container.classList.remove('widget-small','widget-large','widget-full');
+      this.container.classList.remove('widget-small','widget-large', 'widget-extra', 'widget-full');
 
       if (colSpan === 1) this.container.classList.add('widget-small');
       if (colSpan === 2) this.container.classList.add('widget-large');
-      if (colSpan === 3) this.container.classList.add('widget-large');
+      if (colSpan === 3) this.container.classList.add('widget-extra');
       if (colSpan === 4) this.container.classList.add('widget-full');
     };
 
