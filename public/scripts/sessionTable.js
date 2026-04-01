@@ -16,10 +16,10 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
     // Header Row
     // -------------------------
     const headerRow = document.createElement('tr');
-    ['Operation', 'AVERAGE', 'TOTAL', ...columns].forEach((text, idx) => {
+    ['Operation', 'AVG time on tab', 'TOTAL time on tab', ...columns].forEach((text, idx) => {
         const th = document.createElement('th');
         th.classList.add('rotate', 'sticky');
-        if (idx === 0) th.style.position = 'relative';
+        
 
         let displayText = text;
         let sessionIdForClick = text;
@@ -197,7 +197,9 @@ export function renderSessionTable(STATE, perUser, tabs, selectedEmployee = null
             resizer.style.height = '100%';
             resizer.style.cursor = 'col-resize';
 
-            cell.style.position = 'relative';  
+            if (!cell.style.position || cell.style.position !== 'sticky') {
+                cell.style.position = 'relative';
+            } 
             cell.appendChild(resizer);
 
             let startX, startWidth;

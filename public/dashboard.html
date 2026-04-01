@@ -9,40 +9,6 @@
 <link rel="stylesheet" href="styles/dashboard.css">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-  /* Slider styling */
-  .format-slider {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding: 4px 0;
-    margin-bottom: 8px;
-  }
-  .format-slider button {
-    padding: 4px 10px;
-    border: 1px solid #ccc;
-    background: #f0f0f0;
-    cursor: pointer;
-    border-radius: 4px;
-  }
-  .format-slider button.active {
-    background: #007bff;
-    color: #fff;
-    border-color: #007bff;
-  }
-
-  /* Chart wrapper */
-  .chartWrapper {
-    position: relative;
-    width: 100%;
-    height: 300px;
-  }
-
-  .chartCanvas {
-    width: 100% !important;
-    height: 100% !important;
-  }
-</style>
 </head>
 <body>
 
@@ -58,10 +24,7 @@
 <h1 style="padding:16px;">Event Pool Viewer</h1>
 
 <div style="padding:16px;">
-  <button id="addTableWidgetBtn">+ Add Table Widget</button>
-  <button id="addChartWidgetBtn">+ Add Chart Widget</button>
-  <button id="addSessionWidgetBtn">+ Add Session Table</button>
-  <button id="addSessionChartWidgetBtn">+ Add Session Chart</button>
+  <button id="addWidgetBtn">+ Add Widget</button>
 </div>
 
 <div id="widgetGrid"></div>
@@ -72,70 +35,209 @@ import { TableWidget } from './scripts/dashboardTable.js';
 import { ChartWidget } from './scripts/dashboardChart.js';
 import { SessionTableWidget } from './scripts/dashboardTable.js';
 import { SessionChartWidget } from './scripts/dashboardChart.js';
-import { fetchJson } from './scripts/utils.js';
+import { TimelineWidget } from './scripts/dashboardTimeline.js';
 import { Widget } from './scripts/widgets.js';
 
-/* =========================
-   WIDGET ADD BUTTONS
-========================= */
 const grid = document.getElementById('widgetGrid');
-
-document.getElementById('addTableWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-large');
-  grid.appendChild(wrapper);
-  new TableWidget(wrapper);
+const DASHBOARD_STATE = [];
+const widgetTypeMap = {
+  "Table": TableWidget,
+  "Chart": ChartWidget,
+  "Session Table": SessionTableWidget,
+  "Session Chart": SessionChartWidget,
+  "Timeline": TimelineWidget
 };
 
-document.getElementById('addChartWidgetBtn').onclick = () => {
+// Helper: generate unique ID
+function generateId(){ return '_' + Math.random().toString(36).substr(2,9); }
+
+// Get all filters from a widget instance
+function getWidgetFilters(widgetInstance){
+  if(!widgetInstance) return {};
+  if(typeof widgetInstance.getFilters === 'function') return widgetInstance.getFilters();
+  const container = widgetInstance.wrapper || widgetInstance.innerWidget || widgetInstance.container;
+  if(!container) return {};
+  const filters = {};
+  container.querySelectorAll('input, select').forEach(el=>{
+    if(el.type==='checkbox') filters[el.name||el.value||el.className] = el.checked;
+    else filters[el.name||el.value||el.className] = el.value;
+  });
+  return filters;
+}
+
+// Update URL from DASHBOARD_STATE
+function updateURLFromState(){
+  const serialized = btoa(JSON.stringify(DASHBOARD_STATE));
+  window.history.replaceState({}, '', `${window.location.pathname}?state=${serialized}`);
+}
+
+// Create placeholder and attach menu
+function createPlaceholder(wrapper, preType=null, preSize='widget-small', preFilters={}){
+  const placeholder = document.createElement('div');
+  placeholder.classList.add('widget','placeholder-widget');
+  placeholder.draggable = true;
+
+  const placeholderText = document.createElement('div');
+  placeholderText.classList.add('widget-placeholder-text');
+  placeholderText.textContent = preType ? `Click to select widget (${preType})` : 'Click to select widget';
+  placeholder.appendChild(placeholderText);
+
+  const menu = document.createElement('div');
+  menu.classList.add('widget-placeholder-menu');
+
+  const widgetOptions = [
+    { name: 'Table', cls: TableWidget, size: 'widget-small' },
+    { name: 'Chart', cls: ChartWidget, size: 'widget-small' },
+    { name: 'Session Table', cls: SessionTableWidget, size: 'widget-small' },
+    { name: 'Session Chart', cls: SessionChartWidget, size: 'widget-small' },
+    { name: 'Timeline', cls: TimelineWidget, size: 'widget-large' },
+  ];
+
+  widgetOptions.forEach(opt=>{
+    const btn = document.createElement('button');
+    btn.textContent = opt.name;
+    btn.onclick = e=>{
+      e.stopPropagation();
+      wrapper.innerHTML = '';
+      wrapper.className = opt.size;
+      const instance = new opt.cls(wrapper, preFilters);
+      wrapper._widgetInstance = instance;
+
+      // Update state
+      let ws = DASHBOARD_STATE.find(w=>w.id===wrapper.dataset._id);
+      if(!ws){
+        ws = { id: wrapper.dataset._id, type: opt.name, size: opt.size, empty:false, filters: preFilters, position:[...grid.children].indexOf(wrapper) };
+        DASHBOARD_STATE.push(ws);
+      } else {
+        ws.type = opt.name;
+        ws.size = opt.size;
+        ws.empty = false;
+        ws.filters = preFilters;
+      }
+      updateURLFromState();
+
+      // Attach filter listeners
+      attachFilterListener(wrapper, instance);
+    };
+    menu.appendChild(btn);
+  });
+
+  placeholder.appendChild(menu);
+  placeholder.addEventListener('click', e=>{
+    e.stopPropagation();
+    menu.style.display='block';
+  });
+  document.addEventListener('click', ()=>{ menu.style.display='none'; });
+
+  wrapper.appendChild(placeholder);
+}
+
+// Attach listener to detect any filter change and update state & URL
+function attachFilterListener(wrapper, widgetInstance){
+  if(!widgetInstance) return;
+  // onFilterChange from widget
+  if(widgetInstance.onFilterChange){
+    widgetInstance.onFilterChange(()=>{
+      const ws = DASHBOARD_STATE.find(w=>w.id===wrapper.dataset._id);
+      if(ws){
+        ws.filters = getWidgetFilters(widgetInstance);
+        updateURLFromState();
+      }
+    });
+  }
+  // Catch HTML input changes
+  wrapper.addEventListener('change', ()=>{
+    const ws = DASHBOARD_STATE.find(w=>w.id===wrapper.dataset._id);
+    if(ws){
+      ws.filters = getWidgetFilters(widgetInstance);
+      updateURLFromState();
+      if(typeof widgetInstance.apply==='function') widgetInstance.apply();
+    }
+  });
+}
+
+// Load dashboard from URL state
+function loadDashboardFromURL(){
+  const params = new URLSearchParams(window.location.search);
+  const stateStr = params.get('state');
+  if(!stateStr) return;
+
+  try{
+    const stateArray = JSON.parse(atob(stateStr));
+    stateArray.forEach((state, idx)=>{
+      const wrapper = document.createElement('div');
+      wrapper.className = state.size||'widget-small';
+      wrapper.dataset._id = state.id;
+      state.position = idx;
+
+      if(state.empty){
+        createPlaceholder(wrapper, state.type, state.size, state.filters);
+      } else if(state.type){
+        const WidgetClass = widgetTypeMap[state.type];
+        const instance = new WidgetClass(wrapper, state.filters||{});
+        wrapper._widgetInstance = instance;
+
+        // Restore filters
+        if(state.filters){
+          Object.entries(state.filters).forEach(([k,v])=>{
+            const el = wrapper.querySelector(`[name="${k}"],.${k}`);
+            if(el){
+              if(el.type==='checkbox') el.checked = v;
+              else el.value = v;
+            }
+          });
+          if(typeof instance.apply==='function') instance.apply();
+        }
+
+        attachFilterListener(wrapper, instance);
+      }
+
+      DASHBOARD_STATE.push(state);
+      grid.appendChild(wrapper);
+    });
+  } catch(err){ console.error('Failed to load dashboard state', err);}
+}
+
+// Add widget button
+document.getElementById('addWidgetBtn').onclick = ()=>{
   const wrapper = document.createElement('div');
   wrapper.classList.add('widget-small');
+  wrapper.dataset._id = generateId();
+  DASHBOARD_STATE.push({ id:wrapper.dataset._id, empty:true, type:null, size:'widget-small', filters:{}, position:[...grid.children].length });
+  createPlaceholder(wrapper);
   grid.appendChild(wrapper);
-  new ChartWidget(wrapper);
+  updateURLFromState();
 };
 
-document.getElementById('addSessionWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-large');
-  grid.appendChild(wrapper);
-  new SessionTableWidget(wrapper);
-};
-
-document.getElementById('addSessionChartWidgetBtn').onclick = () => {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('widget-small');
-  grid.appendChild(wrapper);
-  new SessionChartWidget(wrapper);
-};
-
-/* =========================
-   DRAG & DROP WIDGETS
-========================= */
+// Drag & drop
 let dragged = null;
-
-document.addEventListener('dragstart', e => {
+document.addEventListener('dragstart', e=>{
   const w = e.target.closest('.widget');
-  if (w) { dragged = w; w.classList.add('dragging'); }
+  if(w){ dragged=w; w.classList.add('dragging'); }
 });
-
-document.addEventListener('dragend', e => {
-  const w = e.target.closest('.widget');
-  if (w) { w.classList.remove('dragging'); dragged = null; }
+document.addEventListener('dragend', e=>{
+  if(dragged){ dragged.classList.remove('dragging'); dragged=null; }
+  [...grid.children].forEach((child, idx)=>{
+    const ws = DASHBOARD_STATE.find(w=>w.id===child.dataset._id);
+    if(ws) ws.position=idx;
+  });
+  updateURLFromState();
 });
-
-document.addEventListener('dragover', e => {
+document.addEventListener('dragover', e=>{
   e.preventDefault();
   const target = e.target.closest('.widget');
-  if (!target || !dragged || target === dragged) return;
+  if(!target || !dragged || target===dragged) return;
   const children = [...grid.children];
   const a = children.indexOf(dragged.parentElement);
   const b = children.indexOf(target.parentElement);
-  if (a < b) grid.insertBefore(dragged.parentElement, target.parentElement.nextSibling);
+  if(a<b) grid.insertBefore(dragged.parentElement, target.parentElement.nextSibling);
   else grid.insertBefore(dragged.parentElement, target.parentElement);
 });
 
+// Initialize dashboard
+loadDashboardFromURL();
+
 </script>
 
-<footer>© TICRA foundation</footer>
 </body>
 </html>

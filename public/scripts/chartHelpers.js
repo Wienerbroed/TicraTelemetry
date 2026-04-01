@@ -15,10 +15,6 @@ export function renderBarChart(canvas, labels, data, colors, options = {}) {
 
 /**
  * Create a reusable slider with stops and labels above
- * @param {HTMLElement} container - Where the slider is rendered
- * @param {Array<string>} stops - Labels for each stop
- * @param {number} width - width in px
- * @param {function} onChange - callback(index) when selection changes
  */
 export function createSlider(container, stops, width = 125, onChange) {
     container.innerHTML = '';
@@ -41,9 +37,14 @@ export function createSlider(container, stops, width = 125, onChange) {
 
     const stopPositions = stops.map((_, i) => i / (stops.length - 1));
 
+    let currentIndex = 0;
+
+    const updateDot = () => {
+        dot.style.left = `${stopPositions[currentIndex] * width}px`;
+    };
+
     // Stop dots and labels
     stopPositions.forEach((pos, i) => {
-        // Stop dot
         const dotStop = document.createElement('div');
         dotStop.style.position = 'absolute';
         dotStop.style.top = '50%';
@@ -56,14 +57,12 @@ export function createSlider(container, stops, width = 125, onChange) {
         dotStop.style.cursor = 'pointer';
         container.appendChild(dotStop);
 
-        // Click on stop
         dotStop.addEventListener('click', () => {
             currentIndex = i;
             updateDot();
             if (onChange) onChange(currentIndex);
         });
 
-        // Label
         const label = document.createElement('div');
         label.textContent = stops[i];
         label.style.position = 'absolute';
@@ -88,12 +87,6 @@ export function createSlider(container, stops, width = 125, onChange) {
     dot.style.cursor = 'pointer';
     container.appendChild(dot);
 
-    let currentIndex = 0;
-
-    const updateDot = () => {
-        dot.style.left = `${stopPositions[currentIndex] * width}px`;
-    };
-
     // Drag logic
     let isDragging = false;
     const onMouseMove = e => {
@@ -103,9 +96,10 @@ export function createSlider(container, stops, width = 125, onChange) {
         if (x < 0) x = 0;
         if (x > width) x = width;
         dot.style.left = `${x}px`;
-        // Snap to nearest stop
+
         const distances = stopPositions.map(pos => Math.abs(pos * width - x));
         currentIndex = distances.indexOf(Math.min(...distances));
+
         if (onChange) onChange(currentIndex);
     };
 
@@ -131,17 +125,38 @@ export function createSlider(container, stops, width = 125, onChange) {
 
     updateDot();
 
-    return () => currentIndex; // getter for current index
+    // ✅ BACKWARD-COMPATIBLE RETURN (fixes your issue)
+    const api = () => currentIndex;
+
+    api.getIndex = () => currentIndex;
+    api.setIndex = (i) => {
+        currentIndex = i;
+        updateDot();
+    };
+
+    return api;
 }
 
 /**
- * Render multiple bar charts with a slider for Count/% selection
+ * Render multiple bar charts with synchronized sliders
  */
 export function renderMultipleBarCharts(container, perUser, eventTypeOrder) {
     container.innerHTML = '';
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(4, 1fr)';
     container.style.gap = '20px';
+
+    let globalModeIndex = 0;
+    const allSliders = [];
+    const chartRenderers = [];
+
+    function syncAll(index) {
+        if (index === globalModeIndex) return;
+
+        globalModeIndex = index;
+        allSliders.forEach(sl => sl.setIndex(index));
+        chartRenderers.forEach(fn => fn());
+    }
 
     eventTypeOrder.forEach((eventType, idx) => {
         const selectionsSet = new Set();
@@ -171,15 +186,17 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder) {
         title.textContent = eventType;
         chartWrapper.appendChild(title);
 
-        // --- Slider container ---
         const sliderContainer = document.createElement('div');
         chartWrapper.appendChild(sliderContainer);
-        const getCurrentIndex = createSlider(
+
+        const sliderControl = createSlider(
             sliderContainer,
             ['Count', '%'],
             125,
-            renderChart
+            (index) => syncAll(index)
         );
+
+        allSliders.push(sliderControl);
 
         const canvas = document.createElement('canvas');
         canvas.id = `chart_${idx}`;
@@ -189,7 +206,8 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder) {
         container.appendChild(chartWrapper);
 
         function renderChart() {
-            const modeIndex = getCurrentIndex(); // 0=Count, 1=Percent
+            const modeIndex = globalModeIndex;
+
             const totals = selections.map(sel =>
                 Object.values(perUser).reduce((sum, userObj) => sum + (userObj[sel] ?? 0), 0)
             );
@@ -233,6 +251,8 @@ export function renderMultipleBarCharts(container, perUser, eventTypeOrder) {
             );
         }
 
-        renderChart();
+        chartRenderers.push(renderChart);
     });
+
+    chartRenderers.forEach(fn => fn());
 }

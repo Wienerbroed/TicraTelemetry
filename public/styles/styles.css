@@ -121,7 +121,7 @@ body > *:not(header):not(footer):not(#tableContainerWrapper) {
 ========================= */
 
 #tableContainerWrapper {
-  width: 46%;
+  width: 97%;
   margin-left: 20px;
   overflow: hidden;   /* prevent outer scroll */
   display: flex;      /* IMPORTANT */
